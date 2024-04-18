@@ -1,10 +1,12 @@
 # coding: utf-8
+# about: Library for shell scripting in Python
 # ver: 2024-03-24
 # author: heX
 # url: https://github.com/heX16
 
 from pathlib import Path
 import os
+import sys
 import stat
 from datetime import datetime, time, date, timedelta
 import subprocess
@@ -12,6 +14,7 @@ from subprocess import CompletedProcess, Popen
 import shutil
 import re
 import typing
+from typing import Any, Callable, Dict, Set, List, Optional
 import platform
 
 try:
@@ -186,7 +189,7 @@ def copy_files(source_dir: Path | str, destination_dir: Path | str):
         if file_to_copy.is_file():
             # Construct the destination path for each file
             destination_file = destination_dir / file_to_copy.name
-            shutil.copy2(file_to_copy, destination_file)
+            copy_file(file_to_copy, destination_file)
             # log(f'File {file_to_copy} copied to {destination_file}')
 
 
@@ -224,6 +227,7 @@ def copy_file(source_file: Path | str, destination_dir: Path | str):
 
     # Copy the file to the destination directory
     shutil.copy2(source_path, destination_path)
+    set_create_time(destination_path, get_create_time(source_path))
     # log(f'File {source_path} copied to {destination_path}')
 
 
@@ -237,11 +241,157 @@ def cp(source: Path | str, destination: Path | str):
         copy_file(source, destination)
 
 
+class ProgressFile:
+    def __init__(self, file: typing.BinaryIO, file_size: int,
+                 callback_print_progress: Callable,
+                 callback_print_data: Optional[Dict] = None,
+                 callback: Optional[Callable] = None,
+                 callback_user_data: Optional[Any] = None):
+        """
+        A file wrapper that facilitates tracking and displaying copy progress, and executing callback functions.
+
+        A file wrapper class used to intercept write operations to a file object,
+        enabling progress tracking and custom callback execution during file copy operations.
+        This class integrates functionality to update the progress based on
+        the amount of data written and optionally calls a user-defined callback function
+        with detailed progress information.
+
+        :param file: File object to which data is written.
+        :param file_size: Total size of the file being copied.
+        :param callback_print_progress: Function to call for printing progress.
+        :param callback_print_data: Data for the progress printing callback.
+        :param callback: Optional user-defined callback function for additional processing.
+        :param callback_user_data: Optional user data for the additional callback.
+        """
+
+        self._file = file
+        self._file_size = file_size
+        self._callback_print_progress = callback_print_progress
+        self._callback = callback
+        self._callback_print_data = callback_print_data
+        self._callback_user_data = callback_user_data
+        self._total_written = 0  # Total number of bytes written
+
+    def write(self, data: bytes) -> None:
+        self._file.write(data)
+
+        self._total_written += len(data)
+
+        # Print progress callback
+        if self._callback_print_progress:
+            self._callback_print_progress(data, len(data), self._total_written, self._file_size,
+                                          self._callback_print_data, 0)
+
+        # Additional custom user callback
+        if self._callback:
+            self._callback(data, len(data), self._total_written, self._file_size, self._callback_user_data, 0)
+
+    def __getattr__(self, attr: str):
+        return getattr(self._file, attr)
+
+
+def print_copy_progress(data: bytes, data_len: int, copied_size: int, file_size: int,
+                        user_data: Any, error_code: int) -> None:
+    """
+    Print progress to the console at most once per second.
+
+    :param data: The latest chunk of data written to the file.
+    :param data_len: The size of the latest data chunk.
+    :param copied_size: Total size of data copied so far.
+    :param file_size: Total size of the file being copied.
+    :param user_data: Dictionary to store user data `Dict{'last_print_time': 0.0}`, like the time of the last print.
+    :paran error_code: Error codes (not working - under development).
+    """
+    current_time = get_datetime().timestamp()
+    last_print_time = user_data.get('last_print_time', 0.0)
+    if current_time != last_print_time:  # Print every second
+        progress = int(copied_size / file_size * 100)
+        progress_bar = progress // 2
+        progress_left = 100 // 2 - progress_bar
+        progress_bar_str = ('=' * progress_bar) + (' ' * progress_left)
+        sys.stdout.write(f'\r[{progress_bar_str}] {progress:3}%  {format_bytes(copied_size)}/{format_bytes(file_size)}')
+        sys.stdout.flush()
+        user_data['last_print_time'] = current_time
+
+    if error_code == 0 and data_len == 0:
+        sys.stdout.write('\r\n')
+        sys.stdout.flush()
+
+
+def copy_file_with_progress(source_path: Path | str, destination_path: Path | str,
+                            follow_symlinks: bool = True,
+                            callback: Optional[Callable] = None,
+                            callback_user_data: Optional[Dict] = None,
+                            callback_print_progress: Optional[Callable] = None) -> None:
+    """
+    Copy a file from source to destination with progress tracking and optional callback execution.
+
+    :param source_path: Path to the source file.
+    :param destination_path: Path to the destination file.
+    :param follow_symlinks: Whether to follow symlinks or copy them as symlinks.
+    :param callback: Optional callback function for custom processing.
+    :param callback_user_data: Data for the custom callback function.
+    :param callback_print_progress: Optional callback for printing progress.
+    """
+    source_path = Path(source_path)
+    destination_path = Path(destination_path)
+
+    if not follow_symlinks and source_path.is_symlink():
+        destination_path.symlink_to(source_path.readlink())
+    else:
+        file_size = source_path.stat().st_size
+        if callback_print_progress is None:
+            callback_print_progress = print_copy_progress
+        callback_print_data = {'last_print_time': 0}
+
+        with source_path.open('rb') as source_file:
+            try:
+                with destination_path.open('wb') as destination_file:
+                    progress_destination_file = ProgressFile(destination_file,
+                                                             file_size,
+                                                             callback_print_progress,
+                                                             callback_print_data,
+                                                             callback,
+                                                             callback_user_data)
+                    shutil.copyfileobj(source_file, progress_destination_file, length=1024 * 1024)
+                    callback_print_progress(b'', 0, file_size, file_size, callback_print_data, 0)
+
+            # Issue [shutil 43219], raise a less confusing exception (copy from shutil)
+            except IsADirectoryError as e:
+                if not destination_path.exists():
+                    raise FileNotFoundError(f'Directory does not exist: {destination_path}') from e
+                else:
+                    raise
+
+        shutil.copystat(source_path, destination_path, follow_symlinks=follow_symlinks)
+        set_create_time(destination_path, get_create_time(source_path))
+
+
+def format_bytes(byte_count, kibi=False):
+    level = ' B'
+    i = '' if not kibi else 'i'
+    divisor = 1024 if kibi else 1000
+    if byte_count >= divisor:
+        level = 'K'
+        byte_count /= divisor
+        if byte_count >= divisor:
+            level = 'M'
+            byte_count /= divisor
+            if byte_count >= divisor:
+                level = 'G'
+                byte_count /= divisor
+                if byte_count >= divisor:
+                    level = 'T'
+                    byte_count /= divisor
+                    if byte_count >= divisor:
+                        level = 'P'
+                        byte_count /= divisor
+    return f"{byte_count:,.0f} {level}{i}B"
+
 def change_filename_ext_in_path(filename: Path, new_extension: str = '.txt') -> Path:
     """
-    Changes the file extension of a given filename to a new extension.
-    There is no real renaming of the file in the file system.
-    Change only in the return value.
+    Changes in value the Path-file extension of a given filename to a new extension.
+    WARNING: There is no real renaming of the file in the file system. Change only in the return value (in the memory).
 
     :param filename: A Path object representing the original filename.
     :param new_extension: A string representing the new file extension, starting with a dot.
@@ -574,6 +724,8 @@ def get_create_time(file_path: Path | str) -> datetime:
     # On Windows, `os.path.getctime()` returns the creation date.
     # On Unix-like systems, it returns the last metadata change on a file or directory.
     # For actual file creation date, this might not be accurate on Unix-like systems.
+    # TODO: `Path.stat().birthtime`: Creation time(on some Unix systems in the FreeBSD family, including macOS)
+    # TODO: This method normally follows symlinks; to stat a symlink add the argument follow_symlinks=False, or use lstat().
     creation_time = os.path.getctime(path)
     return datetime.fromtimestamp(creation_time)
 
@@ -592,10 +744,69 @@ def set_create_time(file_path: Path | str, new_create_date: datetime):
         print(f'The file {path} does not exist or is not a file.')
         return
 
-    timestamp = new_create_date.timestamp()
+    # TODO: implementation for windows
+    #  https://github.com/Delgan/win32-setctime
+    #  https://github.com/kubinka0505/filedate
+    #  https://stackoverflow.com/a/43047398
+
+    """
+    from ctypes import windll, wintypes, byref
+
+    # Arbitrary example of a file and a date
+    filepath = "my_file.txt"
+    epoch = 1561675987.509
+    
+    # Convert Unix timestamp to Windows FileTime using some magic numbers
+    # See documentation: https://support.microsoft.com/en-us/help/167296
+    timestamp = int((epoch * 10000000) + 116444736000000000)
+    ctime = wintypes.FILETIME(timestamp & 0xFFFFFFFF, timestamp >> 32)
+    
+    # Call Win32 API to modify the file creation date
+    handle = windll.kernel32.CreateFileW(filepath, 256, 0, None, 3, 128, None)
+    windll.kernel32.SetFileTime(handle, byref(ctime), None, None)
+    windll.kernel32.CloseHandle(handle)
+    
+    //////////////////////////////
+    
+    def changeFileCreationTime(fname, newtime):
+        wintime = pywintypes.Time(newtime)
+        winfile = win32file.CreateFile(
+            fname, 
+            win32con.GENERIC_WRITE,
+            win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE,
+            None, win32con.OPEN_EXISTING,
+            win32con.FILE_ATTRIBUTE_NORMAL, None)
+    
+        win32file.SetFileTime(winfile, wintime, None, None)
+    
+        winfile.close()
+    //////////////////////////
+    
+    from win32_setctime import setctime
+
+    setctime("my_file.txt", 1561675987.509)
+    
+    from ctypes import windll, wintypes, byref
+
+    # Arbitrary example of a file and a date
+    filepath = "my_file.txt"
+    epoch = 1561675987.509
+    
+    # Convert Unix timestamp to Windows FileTime using some magic numbers
+    # See documentation: https://support.microsoft.com/en-us/help/167296
+    timestamp = int((epoch * 10000000) + 116444736000000000)
+    ctime = wintypes.FILETIME(timestamp & 0xFFFFFFFF, timestamp >> 32)
+    
+    # Call Win32 API to modify the file creation date
+    handle = windll.kernel32.CreateFileW(filepath, 256, 0, None, 3, 128, None)
+    windll.kernel32.SetFileTime(handle, byref(ctime), None, None)
+    windll.kernel32.CloseHandle(handle)
+    """
+
+    #timestamp = new_create_date.timestamp()
     # On Windows, the first value of the tuple sets the creation date.
     # This operation is not guaranteed to change the creation date on Unix-like systems.
-    os.utime(path, (timestamp, path.stat().st_mtime))
+    #os.utime(path, (timestamp, path.stat().st_mtime))
 
 
 # Run ################################################################
@@ -728,12 +939,12 @@ def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> typing
         list: A list of `psutil.Process` objects for the processes that meet the criteria specified by the parameters.
 
     Each Process object in the list can provide various values.
-    list of possible string values: 'cmdline', 'connections', 'cpu_affinity', 'cpu_num', 
-    'cpu_percent', 'cpu_times', 'create_time', 'cwd', 
-    'environ', 'exe', 'gids', 'io_counters', 'ionice', 
-    'memory_full_info', 'memory_info', 'memory_maps', 'memory_percent', 
-    'name', 'nice', 'num_ctx_switches', 'num_fds', 'num_handles', 'num_threads', 
-    'open_files', 'pid', 'ppid', 'status', 'terminal', 'threads', 'uids', 'username'`.  
+    list of possible string values: 'cmdline', 'connections', 'cpu_affinity', 'cpu_num',
+    'cpu_percent', 'cpu_times', 'create_time', 'cwd',
+    'environ', 'exe', 'gids', 'io_counters', 'ionice',
+    'memory_full_info', 'memory_info', 'memory_maps', 'memory_percent',
+    'name', 'nice', 'num_ctx_switches', 'num_fds', 'num_handles', 'num_threads',
+    'open_files', 'pid', 'ppid', 'status', 'terminal', 'threads', 'uids', 'username'`.
     See psutil documentation for more details on these attributes.
     https://psutil.readthedocs.io/en/latest/#psutil.Process.as_dict
 
