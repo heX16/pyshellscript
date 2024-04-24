@@ -847,9 +847,12 @@ def run_command(command: str, background=False, capture_output=False, ensure_uni
         process = subprocess.Popen(command, shell=True)
         return process
     elif capture_output:
-        completed_process = subprocess.run([command], shell=True, check=True, stdout=subprocess.PIPE,
+        completed_process = subprocess.run([command],
+                                           shell=True, check=False,
                                            universal_newlines=True,
-                                           stderr=subprocess.PIPE, text=True)
+                                           text=True,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,)
         return completed_process
     else:
         return subprocess.run(command, shell=True).returncode
