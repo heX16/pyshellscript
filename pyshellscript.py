@@ -36,14 +36,14 @@ def is_linux() -> bool:
     return platform.system().lower() == 'linux'
 
 
-def get_wnd_version() -> str:
+def _get_wnd_version() -> str:
     """Retrieve the Windows version."""
     if not is_wnd():
         raise RuntimeError("Not running on Windows.")
     return platform.version()
 
 
-def get_wnd_name() -> str:
+def _get_wnd_name() -> str:
     if not is_wnd():
         raise RuntimeError("Not running on Windows.")
 
@@ -76,7 +76,7 @@ def get_wnd_name() -> str:
     return f"Windows (Unknown Version: {version})"
 
 
-def get_linux_kernel_version() -> str:
+def _get_linux_kernel_version() -> str:
     """Retrieve the Linux kernel version using a shell command."""
     if not is_linux():
         raise RuntimeError("Not running on Linux.")
@@ -84,7 +84,7 @@ def get_linux_kernel_version() -> str:
     return r.stdout.strip()
 
 
-def get_linux_distributive_name() -> str:
+def _get_linux_distributive_name() -> str:
     """Retrieve the name of the Linux distribution using a shell command."""
     if not is_linux():
         raise RuntimeError("Not running on Linux.")
@@ -93,6 +93,27 @@ def get_linux_distributive_name() -> str:
     distrib_name = r.stdout.strip().strip('"')
     return distrib_name if distrib_name else "Linux Distribution Name Unknown"
 
+def get_os_version() -> str:
+    """
+    Retrieve the version of the operating system.
+    """
+    if is_wnd():
+        return _get_wnd_version()
+    elif is_linux():
+        return _get_linux_kernel_version()
+    else:
+        return "Unsupported operating system."
+
+def get_os_name() -> str:
+    """
+    Retrieve the name of the operating system.
+    """
+    if is_wnd():
+        return _get_wnd_name()
+    elif is_linux():
+        return _get_linux_distributive_name()
+    else:
+        return "Unknown operating system."
 
 # Files ################################################################
 
