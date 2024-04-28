@@ -93,6 +93,7 @@ def _get_linux_distributive_name() -> str:
     distrib_name = r.stdout.strip().strip('"')
     return distrib_name if distrib_name else "Linux Distribution Name Unknown"
 
+
 def get_os_version() -> str:
     """
     Retrieve the version of the operating system.
@@ -104,6 +105,7 @@ def get_os_version() -> str:
     else:
         return "Unsupported operating system."
 
+
 def get_os_name() -> str:
     """
     Retrieve the name of the operating system.
@@ -114,6 +116,7 @@ def get_os_name() -> str:
         return _get_linux_distributive_name()
     else:
         return "Unknown operating system."
+
 
 # Files ################################################################
 
@@ -408,6 +411,7 @@ def format_bytes(byte_count, kibi=False):
                         level = 'P'
                         byte_count /= divisor
     return f"{byte_count:,.0f} {level}{i}B"
+
 
 def change_filename_ext_in_path(filename: Path, new_extension: str = '.txt') -> Path:
     """
@@ -824,10 +828,10 @@ def set_create_time(file_path: Path | str, new_create_date: datetime):
     windll.kernel32.CloseHandle(handle)
     """
 
-    #timestamp = new_create_date.timestamp()
+    # timestamp = new_create_date.timestamp()
     # On Windows, the first value of the tuple sets the creation date.
     # This operation is not guaranteed to change the creation date on Unix-like systems.
-    #os.utime(path, (timestamp, path.stat().st_mtime))
+    # os.utime(path, (timestamp, path.stat().st_mtime))
 
 
 # Run ################################################################
@@ -873,7 +877,7 @@ def run_command(command: str, background=False, capture_output=False, ensure_uni
                                            universal_newlines=True,
                                            text=True,
                                            stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,)
+                                           stderr=subprocess.PIPE, )
         return completed_process
     else:
         return subprocess.run(command, shell=True).returncode
@@ -1030,6 +1034,7 @@ def proc_list_to_pid_list(proc_list):
         result.append(p.pid)
     return result
 
+
 def proc_list_to_names_list(proc_list):
     """Convert a list of psutil.Process objects to a list of process names.
 
@@ -1042,6 +1047,7 @@ def proc_list_to_names_list(proc_list):
     for p in proc_list:
         result.append(p.name())
     return result
+
 
 def proc_list_to_dict(proc_list, attrs):
     """Convert a list of psutil.Process objects to a list of dictionaries representing process attributes.
@@ -1061,6 +1067,7 @@ def proc_list_to_dict(proc_list, attrs):
             pass  # Ignore processes that could not be accessed or do not exist anymore
 
     return result
+
 
 def print_process_list_example(process_list, print_format="{:<8} {:<30} {:<10} {}"):
     """
