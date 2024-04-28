@@ -265,7 +265,7 @@ def cp(source: Path | str, destination: Path | str):
         copy_file(source, destination)
 
 
-class ProgressFile:
+class CopyFileProgressTracker:
     def __init__(self, file: typing.BinaryIO, file_size: int,
                  callback_print_progress: Callable,
                  callback_print_data: Optional[Dict] = None,
@@ -356,6 +356,10 @@ def copy_file_with_progress(source_path: Path | str, destination_path: Path | st
     :param callback: Optional callback function for custom processing.
     :param callback_user_data: Data for the custom callback function.
     :param callback_print_progress: Optional callback for printing progress.
+
+    callback propotype:
+    `def print_copy_progress(data: bytes, data_len: int, copied_size: int, file_size: int,
+                        user_data: Any, error_code: int) -> None`
     """
     source_path = Path(source_path)
     destination_path = Path(destination_path)
@@ -371,12 +375,12 @@ def copy_file_with_progress(source_path: Path | str, destination_path: Path | st
         with source_path.open('rb') as source_file:
             try:
                 with destination_path.open('wb') as destination_file:
-                    progress_destination_file = ProgressFile(destination_file,
-                                                             file_size,
-                                                             callback_print_progress,
-                                                             callback_print_data,
-                                                             callback,
-                                                             callback_user_data)
+                    progress_destination_file = CopyFileProgressTracker(destination_file,
+                                                                        file_size,
+                                                                        callback_print_progress,
+                                                                        callback_print_data,
+                                                                        callback,
+                                                                        callback_user_data)
                     shutil.copyfileobj(source_file, progress_destination_file, length=1024 * 1024)
                     callback_print_progress(b'', 0, file_size, file_size, callback_print_data, 0)
 
@@ -598,7 +602,7 @@ def find_dir(directory_path: Path | str, search_mask: str, recursively: bool = F
     return dir_generator(directory_path, search_mask, recursively)
 
 
-def get_perm(p: Path | str) -> str:
+def get_file_perm(p: Path | str) -> str:
     """
     Retrieves the file permissions of a given path in octal format, or returns
     a modified value if the operating system is Windows.
@@ -616,10 +620,10 @@ def get_perm(p: Path | str) -> str:
     str: A string representing the file permissions in octal format on Linux.
 
     Example:
-    >>> get_perm(Path('/path/to/file'))
+    >>> get_file_perm(Path('/path/to/file'))
     '755'  # On Linux
-    '777'  # On Windows (not read-only)
-    '555'  # On Windows (read-only)
+    '777'  # On Windows, not read-only file
+    '555'  # On Windows, read-only file
     """
     p = Path(p)
     if os.name == 'nt':  # Checks if the operating system is Windows
@@ -634,12 +638,6 @@ def get_perm(p: Path | str) -> str:
 def get_current_dir() -> Path:
     """
     Get the current working directory as a `Path` object.
-
-    Returns:
-        Path: The current working directory.
-
-    Example:
-        print(get_current_dir())  # Outputs the current working directory
     """
     return Path.cwd()
 
