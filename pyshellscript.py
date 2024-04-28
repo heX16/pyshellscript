@@ -755,48 +755,48 @@ def set_create_time(file_path: Path | str, new_create_date: datetime):
     # Arbitrary example of a file and a date
     filepath = "my_file.txt"
     epoch = 1561675987.509
-    
+
     # Convert Unix timestamp to Windows FileTime using some magic numbers
     # See documentation: https://support.microsoft.com/en-us/help/167296
     timestamp = int((epoch * 10000000) + 116444736000000000)
     ctime = wintypes.FILETIME(timestamp & 0xFFFFFFFF, timestamp >> 32)
-    
+
     # Call Win32 API to modify the file creation date
     handle = windll.kernel32.CreateFileW(filepath, 256, 0, None, 3, 128, None)
     windll.kernel32.SetFileTime(handle, byref(ctime), None, None)
     windll.kernel32.CloseHandle(handle)
-    
+
     //////////////////////////////
-    
+
     def changeFileCreationTime(fname, newtime):
         wintime = pywintypes.Time(newtime)
         winfile = win32file.CreateFile(
-            fname, 
+            fname,
             win32con.GENERIC_WRITE,
             win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE,
             None, win32con.OPEN_EXISTING,
             win32con.FILE_ATTRIBUTE_NORMAL, None)
-    
+
         win32file.SetFileTime(winfile, wintime, None, None)
-    
+
         winfile.close()
     //////////////////////////
-    
+
     from win32_setctime import setctime
 
     setctime("my_file.txt", 1561675987.509)
-    
+
     from ctypes import windll, wintypes, byref
 
     # Arbitrary example of a file and a date
     filepath = "my_file.txt"
     epoch = 1561675987.509
-    
+
     # Convert Unix timestamp to Windows FileTime using some magic numbers
     # See documentation: https://support.microsoft.com/en-us/help/167296
     timestamp = int((epoch * 10000000) + 116444736000000000)
     ctime = wintypes.FILETIME(timestamp & 0xFFFFFFFF, timestamp >> 32)
-    
+
     # Call Win32 API to modify the file creation date
     handle = windll.kernel32.CreateFileW(filepath, 256, 0, None, 3, 128, None)
     windll.kernel32.SetFileTime(handle, byref(ctime), None, None)
@@ -907,6 +907,9 @@ def proc_present(process_name: str, ignore_exe_extension: bool | typing.Any = No
     >>> proc_present("python")
     True  # This would return True if a 'python' or 'python.exe' process is running, False otherwise.
     """
+    if psutil is None:
+        raise ImportError('The psutil library is required but not installed. Install it using `pip install psutil`')
+
     if is_wnd() and ignore_exe_extension is None:
         ignore_exe_extension = True
 
@@ -924,23 +927,22 @@ def proc_present(process_name: str, ignore_exe_extension: bool | typing.Any = No
     return False
 
 
-def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> typing.List[psutil.Process]:
+def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> list:
     """
     Retrieves a list of running processes, with options to filter system, core, or user processes.
 
     This function iterates over all processes running on the system and optionally filters out system or
     core processes based on the given parameters. It can also be set to return only system processes.
 
-    Args:
-        skip_system (bool): If True, system processes are skipped. Defaults to True.
-        skip_core (bool): If True, core processes (those without a command line or associated user) are skipped.
-            Defaults to True.
-        only_system (bool): If True, only system processes are returned. When set, `skip_system` is ignored.
-            Defaults to False.
+    @param skip_system: bool -- If True, system processes are skipped. Defaults to True.
+    @param skip_core: bool -- If True, core processes (those without a command line or associated user) are skipped.
+        Defaults to True.
+    @param only_system: bool -- If True, only system processes are returned. When set, `skip_system` is ignored.
+        Defaults to False.
+    @return: list[psutil.Process] -- A list of `psutil.Process` objects for the processes that meet the criteria
+        specified by the parameters.
 
-    Returns:
-        list: A list of `psutil.Process` objects for the processes that meet the criteria specified by the parameters.
-
+    @details:
     Each Process object in the list can provide various values.
     list of possible string values: 'cmdline', 'connections', 'cpu_affinity', 'cpu_num',
     'cpu_percent', 'cpu_times', 'create_time', 'cwd',
@@ -950,9 +952,8 @@ def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> typing
     'open_files', 'pid', 'ppid', 'status', 'terminal', 'threads', 'uids', 'username'`.
     See psutil documentation for more details on these attributes.
     https://psutil.readthedocs.io/en/latest/#psutil.Process.as_dict
-
     Examples:
-        # Get a list of all non-system, non-core processes
+        # Get a list of all processes
         process_list = get_proc_list()
 
         # Convert the process list to a dictionary with specified attributes
@@ -965,6 +966,9 @@ def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> typing
 
         print(ps_exec)
     """
+    if psutil is None:
+        raise ImportError("The psutil library is required but not installed. Install it using 'pip install psutil'")
+
     result = []
     if only_system:
         skip_system = False
@@ -983,38 +987,59 @@ def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> typing
             cmd = p.cmdline()
             if skip_core and (cmd is None or cmd == ''):
                 continue
-            if only_system and sys is False:
+            if only_system and not sys:
                 continue
 
-            result += [p]
+            result.append(p)
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
+            pass  # Ignore processes that could not be accessed or do not exist anymore
     return result
 
 
-def proc_list_to_pid_list(proc_list: typing.List[psutil.Process]) -> typing.List[int]:
+def proc_list_to_pid_list(proc_list):
+    """Convert a list of psutil.Process objects to a list of process IDs (PIDs).
+
+    @param proc_list: list[psutil.Process] -- List of process objects from the psutil library.
+    @return: list[int] -- List of process IDs.
+    """
+    if psutil is None:
+        raise ImportError('The psutil library is required but not installed. Install it using `pip install psutil`')
     result = []
     for p in proc_list:
-        result += [p.pid]
+        result.append(p.pid)
     return result
 
+def proc_list_to_names_list(proc_list):
+    """Convert a list of psutil.Process objects to a list of process names.
 
-def proc_list_to_names_list(proc_list: typing.List[psutil.Process]) -> typing.List[str]:
+    @param proc_list: list[psutil.Process] -- List of process objects from the psutil library.
+    @return: list[str] -- List of process names.
+    """
+    if psutil is None:
+        raise ImportError('The psutil library is required but not installed. Install it using `pip install psutil`')
     result = []
     for p in proc_list:
-        result += [p.name()]
+        result.append(p.name())
     return result
-
 
 def proc_list_to_dict(proc_list, attrs):
+    """Convert a list of psutil.Process objects to a list of dictionaries representing process attributes.
+
+    @param proc_list: list[psutil.Process] -- List of process objects from the psutil library.
+    @param attrs: list[str] -- List of attributes to retrieve for each process.
+    @return: list[dict] -- List of dictionaries with keys as attributes and values as the corresponding process information.
+    """
+    if psutil is None:
+        raise ImportError('The psutil library is required but not installed. Install it using `pip install psutil`')
+
     result = []
     for process in proc_list:
         try:
             result.append(process.as_dict(attrs=attrs))
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-    return result
+            pass  # Ignore processes that could not be accessed or do not exist anymore
 
+    return result
 
 def print_process_list_example(process_list, print_format="{:<8} {:<30} {:<10} {}"):
     """

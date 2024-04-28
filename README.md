@@ -1,2 +1,2 @@
-# py_shell_script
+# pyshellscript
 Library for shell scripting in Python
