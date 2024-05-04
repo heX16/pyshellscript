@@ -921,8 +921,6 @@ def run_command(command: str,
 
     if input is not None and stdin is not None:
         raise ValueError("Both 'input' and 'stdin' cannot be provided simultaneously.")
-    if background and return_returncode:
-        raise ValueError("Both 'background' and 'return_returncode' cannot be provided simultaneously.")
     if background and capture_output:
         raise ValueError("Both 'background' and 'capture_output' cannot be provided simultaneously.")
 
