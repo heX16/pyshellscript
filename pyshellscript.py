@@ -835,27 +835,27 @@ def set_create_time(file_path: Path | str, new_create_date: datetime):
 # Run ################################################################
 
 
-
 # Error code after function call `run_command` or `sh`.
 # This variable is used after invoking `run_command` or `sh`.
-# (used 'fish shell' compatible name).
-status = None
+returncode = None
+
 
 def get_last_error() -> int | None:
     """
     Returns the last error code.
-    @see status, get_error_code
+    @see returncode, get_error_code
     """
-    global status
-    return status
+    global returncode
+    return returncode
+
 
 def get_error_code() -> int | None:
     """
     Returns the last error code.
-    @see status, get_last_error
+    @see returncode, get_last_error
     """
-    global status
-    return status
+    global returncode
+    return returncode
 
 def run_command(command: str,
                 capture_output=False,
@@ -863,27 +863,28 @@ def run_command(command: str,
                 stdin=None,
                 background=False,
                 ensure_unique=False,
+                return_returncode=False,
                 raise_exception=False) -> subprocess.CompletedProcess | subprocess.Popen | int | bool:
     """
-    Executes a command with options to run in the background, capture output, and ensure it runs only once.
+    Executes a command with options to run in the background, capture output, ensure it runs only once, and handle stdin.
 
     Parameters:
     - command (str): The shell command to execute.
-    - capture_output (bool): Whether to capture the command's stdout and stderr. Defaults to False.
-    - input (str): String to send to the stdin of the subprocess.
-    - stdin (subprocess.PIPE or similar): The stdin stream for the subprocess.
     - background (bool): Whether to run the command in the background. Defaults to False.
+    - capture_output (bool): Whether to capture the command's stdout and stderr. Defaults to False.
     - ensure_unique (bool): Ensure the command runs only if it's not already running. Defaults to False.
     - raise_exception (bool): Whether to raise an exception if the command is already running and ensure_unique is True.
+    - input (str): String to send to the stdin of the subprocess.
+    - stdin (subprocess.PIPE or similar): The stdin stream for the subprocess. This should not be used together with 'input'.
 
     Returns:
-    - If capture_output is True, returns a `subprocess.CompletedProcess` instance.
-    - If background is True, returns a `subprocess.Popen` instance.
-    - Otherwise, returns `int` - error code.
-    - If ensure_unique is True and the process present, returns `False`.
+    - Returns a `subprocess.Popen` instance. Useful variables: returncode, stdout, stderr.
+    - If return_returncode==True returns error code `int`.
+    - If ensure_unique==True and the process already present, returns `False`.
 
     Raises:
     - RuntimeError: If ensure_unique is True and raise_exception is True and the process is already running.
+    - ValueError: If both 'input' and 'stdin' are provided.
 
     Examples:
         ```
@@ -891,47 +892,54 @@ def run_command(command: str,
         if output.stdout:
             grep_output = run_command('grep test_line', capture_output=True, input=output.stdout)
             print(grep_output.stdout)
-        ```
     """
-    # TODO: add argument `check_param: bool = True`
-    # TODO: add argument `wait_time_if_found: int = -1`
-    # TODO: `print_result`
+    # TODO: add argument `ensure_unique_check_param = True`
+    # TODO: add argument `wait_time_if_found = -1`
+    # TODO: add argument `timeout = -1`
+    # TODO: add argument `print_result = False` ?
 
-    global status
+    global returncode
+
+    if input is not None and stdin is not None:
+        raise ValueError("Both 'input' and 'stdin' cannot be provided simultaneously.")
+    if background and return_returncode:
+        raise ValueError("Both 'background' and 'return_returncode' cannot be provided simultaneously.")
+    if background and capture_output:
+        raise ValueError("Both 'background' and 'capture_output' cannot be provided simultaneously.")
 
     if ensure_unique:
         # TODO: [BUG] get_filename(command) - need add the trim of the param part
         proc_name = str(get_filename(command))
         if proc_present(proc_name):
-            status = None
+            returncode = None
             if raise_exception:
                 raise RuntimeError(f"{proc_name} is already running.")
             else:
                 return False
 
-    if background:
-        status = None
-        if input is not None:
-            process = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
-            process.stdin.write(input)
-            process.stdin.close()
-        else:
-            process = subprocess.Popen(command, shell=True)
-        return process
-    elif capture_output:
-        completed_process = subprocess.run([command],
-                                           shell=True, check=False,
-                                           universal_newlines=True,
-                                           text=True,
-                                           input=input,
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE, )
-        status = completed_process.returncode
-        return completed_process
+    stdin_setting = None
+    if stdin is not None:
+        stdin_setting = stdin
+    elif input is not None:
+        stdin_setting = subprocess.PIPE
+
+    stdout_setting = subprocess.PIPE if capture_output else None
+
+    process = subprocess.Popen(
+        command, shell=True,
+        stdin=stdin_setting, stdout=stdout_setting, stderr=subprocess.PIPE, text=True, universal_newlines=True)
+    if input is not None:
+        process.stdin.write(input.encode('utf-8'))
+        process.stdin.close()
+
+    if not background:
+        process.wait()
+        returncode = process.returncode
+
+    if return_returncode:
+        return process.returncode
     else:
-        result = subprocess.run(command, shell=True, input=input).returncode
-        status = result.returncode
-        return result
+        return process
 
 
 def sh(command_string: str, background=False, capture_output=False, ensure_unique=False):
