@@ -835,16 +835,46 @@ def set_create_time(file_path: Path | str, new_create_date: datetime):
 # Run ################################################################
 
 
-def run_command(command: str, background=False, capture_output=False, ensure_unique=False,
-                raise_exception=False) -> CompletedProcess | Popen | int | bool:
+
+# Error code after function call `run_command` or `sh`.
+# This variable is used after invoking `run_command` or `sh`.
+# (used 'fish shell' compatible name).
+status = None
+
+def get_last_error() -> int | None:
+    """
+    Returns the last error code.
+    @see status, get_error_code
+    """
+    global status
+    return status
+
+def get_error_code() -> int | None:
+    """
+    Returns the last error code.
+    @see status, get_last_error
+    """
+    global status
+    return status
+
+def run_command(command: str,
+                capture_output=False,
+                input=None,
+                stdin=None,
+                background=False,
+                ensure_unique=False,
+                raise_exception=False) -> subprocess.CompletedProcess | subprocess.Popen | int | bool:
     """
     Executes a command with options to run in the background, capture output, and ensure it runs only once.
 
     Parameters:
     - command (str): The shell command to execute.
-    - background (bool): Whether to run the command in the background. Defaults to False.
     - capture_output (bool): Whether to capture the command's stdout and stderr. Defaults to False.
+    - input (str): String to send to the stdin of the subprocess.
+    - stdin (subprocess.PIPE or similar): The stdin stream for the subprocess.
+    - background (bool): Whether to run the command in the background. Defaults to False.
     - ensure_unique (bool): Ensure the command runs only if it's not already running. Defaults to False.
+    - raise_exception (bool): Whether to raise an exception if the command is already running and ensure_unique is True.
 
     Returns:
     - If capture_output is True, returns a `subprocess.CompletedProcess` instance.
@@ -854,31 +884,54 @@ def run_command(command: str, background=False, capture_output=False, ensure_uni
 
     Raises:
     - RuntimeError: If ensure_unique is True and raise_exception is True and the process is already running.
+
+    Examples:
+        ```
+        output = run_command('cat test.txt', capture_output=True)
+        if output.stdout:
+            grep_output = run_command('grep test_line', capture_output=True, input=output.stdout)
+            print(grep_output.stdout)
+        ```
     """
     # TODO: add argument `check_param: bool = True`
     # TODO: add argument `wait_time_if_found: int = -1`
     # TODO: `print_result`
+
+    global status
+
     if ensure_unique:
-        proc_name = str(get_filename(command))  # Assuming the command's executable name is the first word
+        # TODO: [BUG] get_filename(command) - need add the trim of the param part
+        proc_name = str(get_filename(command))
         if proc_present(proc_name):
+            status = None
             if raise_exception:
                 raise RuntimeError(f"{proc_name} is already running.")
             else:
                 return False
 
     if background:
-        process = subprocess.Popen(command, shell=True)
+        status = None
+        if input is not None:
+            process = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
+            process.stdin.write(input)
+            process.stdin.close()
+        else:
+            process = subprocess.Popen(command, shell=True)
         return process
     elif capture_output:
         completed_process = subprocess.run([command],
                                            shell=True, check=False,
                                            universal_newlines=True,
                                            text=True,
+                                           input=input,
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE, )
+        status = completed_process.returncode
         return completed_process
     else:
-        return subprocess.run(command, shell=True).returncode
+        result = subprocess.run(command, shell=True, input=input).returncode
+        status = result.returncode
+        return result
 
 
 def sh(command_string: str, background=False, capture_output=False, ensure_unique=False):
