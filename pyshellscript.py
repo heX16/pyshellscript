@@ -8,6 +8,8 @@ from pathlib import Path
 import os
 import sys
 import stat
+import io
+from time import sleep
 from datetime import datetime, time, date, timedelta
 import subprocess
 from subprocess import CompletedProcess, Popen
@@ -16,6 +18,7 @@ import re
 import typing
 from typing import Any, Callable, Dict, Set, List, Optional
 import platform
+import pprint
 
 try:
     import psutil  # pip install psutil
@@ -857,13 +860,37 @@ def get_error_code() -> int | None:
     global returncode
     return returncode
 
+
+class RunOk(subprocess.CompletedProcess):
+
+    def __init__(self, args, set_returncode, stdout: io.StringIO, stderr: io.StringIO):
+        super().__init__(args, set_returncode, stdout, stderr)
+        self.stdout: io.StringIO = stdout
+        self.stderr: io.StringIO = stderr
+
+
+class RunFail(subprocess.CompletedProcess):
+
+    def __init__(self, args, exception):
+        super().__init__(args, -1, None, None)
+        self.exception = exception
+        self.stdout = io.StringIO('')
+        self.stderr = self.stdout
+
+
+class RunFailProcessPresent(subprocess.CompletedProcess):
+
+    def __init__(self, args):
+        super().__init__(args, None)
+
+
 def run_command(command: str,
                 capture_output=False,
-                input: str=None,
+                stdin_text: str | bytes = None,
                 stdin=None,
                 background=False,
                 ensure_unique=False,
-                raise_exception=False) -> subprocess.CompletedProcess | subprocess.Popen | int | bool:
+                raise_exception=False) -> subprocess.Popen | RunOk | RunFail | RunFailProcessPresent:
     """
     Executes a command with various options such as running in the background, capturing output, ensuring uniqueness,
     and handling custom stdin input.
@@ -888,6 +915,17 @@ def run_command(command: str,
     Raises:
     - RuntimeError: If ensure_unique is True, raise_exception is True, and the process is already running.
     - ValueError: If incompatible options are combined.
+    - ValueError('Invalid stdin. Use background=True'): The passed `stdin` is not of the correct type
+      (this type is formed after closing the application).
+      Use `background=True` for the _first_ application and then call the second application.
+
+    Note:
+      If you want to redirect the output of the first application to the second application.
+      Then use the `result.stdout` obtained after calling the first application and pass it
+      to the `stdin` parameter when calling the second application.
+      But the first application must be running at that point - use the
+      `background=True` and `capture_output=True` parameters.
+
 
     Examples:
         # Example 1: Capturing output of a command
@@ -907,7 +945,7 @@ def run_command(command: str,
         print(out_str)
 
         # Example 4: Pipe example (stdin version)
-        output_process = run_command('cat test.txt', background=True)
+        output_process = run_command('cat test.txt', capture_output=True, background=True)
         grep_process = run_command('grep test_line', stdin=output_process.stdout)
         print(grep_process.stdout)
 
@@ -919,10 +957,10 @@ def run_command(command: str,
 
     global returncode
 
-    if input is not None and stdin is not None:
-        raise ValueError("Both 'input' and 'stdin' cannot be provided simultaneously.")
-    if background and capture_output:
-        raise ValueError("Both 'background' and 'capture_output' cannot be provided simultaneously.")
+    if stdin_text is not None and stdin is not None:
+        raise ValueError('Both `input` and `stdin` cannot be provided simultaneously.')
+    if isinstance(stdin, io.StringIO):
+        raise ValueError('Invalid `stdin`. Use `background=True`')
 
     returncode = None
     if ensure_unique:
@@ -930,28 +968,52 @@ def run_command(command: str,
         proc_name = str(get_filename(command))
         if proc_present(proc_name):
             if raise_exception:
-                raise RuntimeError(f"{proc_name} is already running.")
+                raise RuntimeError(f'"{proc_name}" is already running.')
             else:
-                return False
+                return RunFailProcessPresent(command)
 
     stdin_setting = None
     if stdin is not None:
         stdin_setting = stdin
-    elif input is not None:
+    elif stdin_text is not None:
         stdin_setting = subprocess.PIPE
 
     stdout_setting = subprocess.PIPE if capture_output else None
 
-    process = subprocess.Popen(
-        command, shell=True,
-        stdin=stdin_setting, stdout=stdout_setting, stderr=subprocess.PIPE, text=True, universal_newlines=True)
-    if input is not None:
-        process.stdin.write(input.encode('utf-8'))
-        process.stdin.close()
+    try:
+        process = subprocess.Popen(
+            command, shell=True,
+            stdin=stdin_setting, stdout=stdout_setting, stderr=subprocess.PIPE, text=True, universal_newlines=True)
+    except (OSError, ValueError, subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+        if raise_exception:
+            raise e
+        else:
+            return RunFail(command, e)
+
+    if stdin_text is not None:
+        if isinstance(stdin_text, bytes):
+            stdin_text = stdin_text.decode('utf-8')
+        if process.poll() is None:
+            try:
+                process.stdin.write(stdin_text)
+                process.stdin.close()
+            except (ValueError, OSError):
+                pass
 
     if not background:
-        process.wait()
+        stdout_io = None
+        stderr_io = None
+        if capture_output:
+            stdout_str, stderr_str = process.communicate()
+            # return result as `io` object (for compatible)
+            # we can't return original `process.stdout` - because it is already empty (used and closed)
+            stdout_io = io.StringIO(stdout_str)
+            stderr_io = io.StringIO(stderr_str)
+        else:
+            process.wait()
         returncode = process.returncode
+        # replace `process` object
+        process = RunOk(command, process.returncode, stdout_io, stderr_io)
 
     return process
 
@@ -1191,11 +1253,18 @@ def datetime_trim_ms(t: datetime | time) -> datetime | time:
 
 
 def get_datetime() -> datetime:
+    """ Alias for the `now()` """
     return datetime.now()
 
 
 def now() -> datetime:
+    """ Return the current time """
     return datetime.now()
+
+
+def delay(second: float):
+    """ Alias for the `sleep()` """
+    sleep(second)
 
 
 # Utils ################################################################
