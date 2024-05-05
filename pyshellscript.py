@@ -897,63 +897,58 @@ def run_command(command: str,
 
     Parameters:
     - command (str): The shell command to execute.
+    - capture_output (bool): Whether to capture the command's stdout and stderr. Defaults to False. If set to True, stdout
+      and stderr are captured and can be accessed via the process object or RunOk instance.
+    - stdin_text (str | bytes): Text or bytes to send to the stdin of the subprocess. This should not be used with 'stdin'.
+    - stdin (subprocess.PIPE or similar): The stdin stream for the subprocess. This should not be used together with 'stdin_text'.
     - background (bool): Whether to run the command in the background. Defaults to False. If set to True, the function returns
       immediately with a subprocess.Popen object, and you will not receive captured output or a return code.
-    - capture_output (bool): Whether to capture the command's stdout and stderr. Defaults to False. If set to True, stdout
-      and stderr are captured and can be accessed via the subprocess.Popen object.
     - ensure_unique (bool): Ensure the command runs only if it's not already running. Defaults to False.
     - raise_exception (bool): Whether to raise an exception if the command is already running and ensure_unique is True.
-    - input (str): String to send to the stdin of the subprocess. This parameter should not be used with 'stdin'.
-    - stdin (subprocess.PIPE or similar): The stdin stream for the subprocess. This should not be used together with 'input'.
 
     Returns:
-    - subprocess.Popen: Returns the subprocess.Popen object associated with the running process.
-      Useful object variables: returncode, stdout, stderr.
-      If you want to get the error code: `if run_command(...).returncode == 1: ...`.
-    - bool: If ensure_unique is True and the command is already present, returns False.
+    - subprocess.Popen | RunOk | RunFail | RunFailProcessPresent:
+      If the `background=True` function return a `subprocess.Popen` object.
+      If the `background=False` function return a RunOk instance with captured output,
+      a `RunFail` instance with an exception if there was an exception and `raise_exception=False`,
+      or a `RunFailProcessPresent` instance if the command is already running.
 
     Raises:
-    - RuntimeError: If ensure_unique is True, raise_exception is True, and the process is already running.
-    - ValueError: If incompatible options are combined.
-    - ValueError('Invalid stdin. Use background=True'): The passed `stdin` is not of the correct type
-      (this type is formed after closing the application).
-      Use `background=True` for the _first_ application and then call the second application.
-
-    Note:
-      If you want to redirect the output of the first application to the second application.
-      Then use the `result.stdout` obtained after calling the first application and pass it
-      to the `stdin` parameter when calling the second application.
-      But the first application must be running at that point - use the
-      `background=True` and `capture_output=True` parameters.
-
+    - ValueError: If incompatible options are combined (e.g., both 'stdin_text' and 'stdin' are provided).
 
     Examples:
         # Example 1: Capturing output of a command
         output = run_command('cat test.txt', capture_output=True)
         if output.stdout:
-            print(output.stdout)
+            print(output.stdout.read())
 
         # Example 2: Using the function with background and unique process constraints
         process = run_command('long_running_task --option', background=True, ensure_unique=True)
-        if process==False:
+        if isinstance(process, RunFailProcessPresent):
             print("Process is already running.")
 
         # Example 3: Pipe example (string version)
         output = run_command('cat test.txt', capture_output=True, raise_exception=True)
-        grep_output = run_command('grep test_line', capture_output=True, input=output.stdout, raise_exception=True)
+        grep_output = run_command('grep test_line', capture_output=True, stdin_text=output.stdout.getvalue(), raise_exception=True)
         out_str = grep_output.stdout.read()
         print(out_str)
 
         # Example 4: Pipe example (stdin version)
         output_process = run_command('cat test.txt', capture_output=True, background=True)
         grep_process = run_command('grep test_line', stdin=output_process.stdout)
-        print(grep_process.stdout)
+        print(grep_process.stdout.read())
 
+    Note:
+      To redirect redirect the output of the first application to the second application.
+      Ensure the first application is executed with `background=True` and `capture_output=True`.
+      Then store returned value obtained after calling the first application to the `result`.
+      And pass `result.stdout` to the `stdin` parameter when calling the second application.
     """
+
     # TODO: add argument `ensure_unique_check_param = True`
     # TODO: add argument `wait_time_if_found = -1`
     # TODO: add argument `timeout = -1`
-    # TODO: add argument `print_result = False` ?
+    # TODO: add argument `print_result = False` (?)
 
     global returncode
 
@@ -967,10 +962,7 @@ def run_command(command: str,
         # TODO: [BUG] get_filename(command) - need add the trim of the param part
         proc_name = str(get_filename(command))
         if proc_present(proc_name):
-            if raise_exception:
-                raise RuntimeError(f'"{proc_name}" is already running.')
-            else:
-                return RunFailProcessPresent(command)
+            return RunFailProcessPresent(command)
 
     stdin_setting = None
     if stdin is not None:
