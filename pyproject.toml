@@ -1,10 +1,11 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyshellscript"
-version = "0.2.0"
+version = "0.2.1"
+requires-python = ">=3.3"
 description = "Library for shell scripting in Python"
 authors = [{name = "heX", email = "hex1625616@gmail.com"}]
 license = {file = "LICENSE.txt"}

@@ -1,1 +1,1 @@
-# Empty
+from .pyshellscript import *
