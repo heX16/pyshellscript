@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyshellscript"
+version = "0.2.0"
+description = "Library for shell scripting in Python"
+authors = [{name = "heX", email = "hex1625616@gmail.com"}]
+license = {file = "LICENSE.txt"}
+readme = "README.md"
+keywords = ["shell", "scripting", "system", "files", "processes", "utils"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+dependencies = [
+  "psutil>=5.5.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/heX16/pyshellscript"
+Repository = "https://github.com/heX16/pyshellscript"
+Issues = "https://github.com/heX16/pyshellscript/issues"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=6.0",
+  "black",
+  "isort"
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py36']
