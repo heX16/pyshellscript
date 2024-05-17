@@ -835,6 +835,144 @@ def set_create_time(file_path: Path | str, new_create_date: datetime):
     # os.utime(path, (timestamp, path.stat().st_mtime))
 
 
+def split_file(file_path: Path | str, chunk_size, remove_on_failure=True):
+    """
+    Splits a file into multiple chunks of equal size (except for the last chunk).
+
+    Parameters:
+    file_path (Path): Path to the input file.
+    chunk_size (int): Size of each chunk in bytes.
+    remove_on_failure (bool): If True, removes created chunks if an error occurs. Default is True.
+
+    Returns:
+    bool: True if the operation is successful, False if an error occurs.
+
+    Example:
+        success = split_file(Path('test.txt'), 10000)
+        if success:
+            print("File successfully split into chunks.")
+        else:
+            print("An error occurred while splitting the file.")
+    """
+    file_path = Path(file_path)
+    block_size = 64 * 1024  # 64 KB
+    created_files = []
+    try:
+        with file_path.open('rb') as file:
+            chunk_num = 1
+            while True:
+                chunk_file_name = file_path.with_suffix(f".{chunk_num:03d}")
+                created_files.append(chunk_file_name)
+                with chunk_file_name.open('wb') as chunk_file:
+                    remaining_size = chunk_size
+                    while remaining_size > 0:
+                        block = file.read(min(block_size, remaining_size))
+                        if not block:
+                            break
+                        chunk_file.write(block)
+                        remaining_size -= len(block)
+                    if remaining_size > 0:
+                        break
+                chunk_num += 1
+        return True
+    except IOError:
+        if remove_on_failure:
+            for file_name in created_files:
+                try:
+                    file_name.unlink()
+                except OSError:
+                    pass
+        return False
+
+
+def split_files_get_list(first_chunk_path):
+    """
+    Verifies and lists chunk files in the directory of the given first chunk file.
+
+    Parameters:
+    first_chunk_path (Path): Path to the first chunk file (e.g., 'file.txt.001').
+
+    Returns:
+    list: List of Path objects representing the chunk files if conditions are met, otherwise an empty list.
+    """
+    first_chunk_path = Path(first_chunk_path)
+
+    if first_chunk_path.suffix != '.001':
+        return []
+
+    directory = first_chunk_path.parent
+    base_name = first_chunk_path.stem
+
+    base_name_no_ext = base_name.rsplit('.', 1)[0]
+
+    # Filtering and sorting files by numeric extension, ensuring three-digit extensions only
+    chunk_files = sorted(
+        filter(lambda f: f.suffix[1:].isdigit() and len(f.suffix[1:]) == 3, directory.glob(f"{base_name_no_ext}.*")),
+        key=lambda f: int(f.suffix[1:])
+    )
+
+    if not chunk_files:
+        return []
+
+    expected_size = first_chunk_path.stat().st_size
+    for i, chunk_file in enumerate(chunk_files):
+        current_size = chunk_file.stat().st_size
+        if i < len(chunk_files) - 1 and current_size != expected_size:
+            return False
+        elif i == len(chunk_files) - 1 and current_size > expected_size:
+            return False
+
+    return chunk_files
+
+def combine_files(output_file_path: Path, chunk_files: List[Path]) -> bool:
+    """
+    Combines chunk files into a single output file.
+
+    Parameters:
+    output_file_path (Path): Path to the output file.
+    chunk_files (List[Path]): List of Path objects representing the chunk files.
+
+    Returns:
+    bool: True if the operation is successful, False if an error occurs.
+
+    Example usage:
+    >>> from pathlib import Path
+    >>> files = [Path('file.txt.001'), Path('file.txt.002'), Path('file.txt.003'), Path('file.txt.004')]
+    >>> success = combine_files(Path('combined_file.txt'), files)
+    >>> if success:
+    >>>     print("Files successfully combined into one.")
+    >>> else:
+    >>>     print("An error occurred while combining the files.")
+    """
+    block_size = 64 * 1024  # 64 KB
+    try:
+        with output_file_path.open('wb') as output_file:
+            for chunk_file in chunk_files:
+                with chunk_file.open('rb') as file:
+                    while True:
+                        block = file.read(block_size)
+                        if not block:
+                            break
+                        output_file.write(block)
+        return True
+    except IOError:
+        return False
+
+def file_list_calc_total_size(file_list: List[Path]) -> int:
+    """
+    Calculates the total size of all files in the given list.
+
+    Parameters:
+    file_list (List[Path]): List of Path objects representing the files.
+
+    Returns:
+    int: Total size of the files in bytes.
+    """
+    total_size: int = sum(file.stat().st_size for file in file_list)
+    return total_size
+
+
+
 # Run ################################################################
 
 
