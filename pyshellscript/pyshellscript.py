@@ -123,6 +123,16 @@ def get_os_name() -> str:
 
 # Files ################################################################
 
+def rmdir(path: str | Path, must_be_empty=False, recursive=True):
+    # todo: doc
+    # todo: check must_be_empty
+    # todo: check recursive
+    if not path.is_dir():
+        raise IsADirectoryError(f'Cannot remove {path} because it is not a directory.')
+
+    if path.is_dir():
+        rm(path, recursive=recursive)
+
 
 def rm(path: str | Path, recursive=False):
     """
@@ -259,6 +269,7 @@ def copy_file(source_file: Path | str, destination_dir: Path | str):
 
 
 def cp(source: Path | str, destination: Path | str):
+    # TODO: documentation
     source = Path(source)
     destination = Path(destination)
 
@@ -478,9 +489,9 @@ def move_file_to_dir(source: Path | str, destination_dir: Path | str) -> None:
 
     Example:
     ```
-    source_path = Path("path/to/source/file.txt")
-    destination_directory = Path("path/to/destination/")
-    move_file_to_dir(source_path, destination_directory)
+    >>> source_path = Path("path/to/source/file.txt")
+    >>> destination_directory = Path("path/to/destination/")
+    >>> move_file_to_dir(source_path, destination_directory)
     ```
     """
     source = Path(source)
@@ -540,6 +551,7 @@ def find(
 
 
     Example:
+        ```
         for file in find('~/', '*', recursively=True):
             print(str(file))
 
@@ -554,7 +566,7 @@ def find(
                 print(str(file))
         else:
             print('File not found')
-
+        ```
     """
     directory_path = Path(directory_path).expanduser()
     if not directory_path.exists():
@@ -584,8 +596,8 @@ def find_dir(directory_path: Path | str, search_mask: str, recursively: bool = F
         FileNotFoundError: If the specified directory does not exist.
 
     Example:
-        for directory in find_directories('~/', 'subdir*', recursively=True):
-            print(str(directory))
+        >>> for directory in find_dir('~/', 'subdir*', recursively=True):
+        >>>    print(str(directory))
     """
 
     def dir_generator(path, mask, recursive):
@@ -672,7 +684,7 @@ def set_current_dir(new_directory: Path | str) -> None:
         PermissionError: If the script lacks necessary permissions to change the current directory.
 
     Example:
-        set_current_dir('/path/to/new/directory')  # Changes the current working directory
+    >>> set_current_dir('/path/to/new/directory')  # Changes the current working directory
     """
     new_directory = Path(new_directory).expanduser()
 
@@ -717,8 +729,8 @@ def check_ext(f: Path | str, ext_list: list[str]) -> bool:
               False otherwise.
 
     Examples:
-        if check_ext(Path("example.txt"), ['txt', 'md']):
-            print(f"Extension is allowed.")
+    >>> if check_ext(Path("example.txt"), ['txt', 'md']):
+    >>>   print(f"Extension is allowed.")
     """
     ext_list = [i.lower() for i in ext_list]
     return (ext_list[0] == '*') or (Path(f).suffix.lower()[1:] in ext_list)
@@ -835,6 +847,24 @@ def set_create_time(file_path: Path | str, new_create_date: datetime):
     # os.utime(path, (timestamp, path.stat().st_mtime))
 
 
+def touch(file: Path | str, mode=None, exist_ok=True):
+    # todo: doc
+    file = Path(file)
+    file.touch(mode=mode, exist_ok=exist_ok)
+
+
+def chmod(path: Path | str, mode, follow_symlinks=True):
+    # todo: WIP!!!
+    path = Path(path)
+    path.chmod(mode=mode, follow_symlinks=follow_symlinks)
+
+
+def chown(path: Path | str, owner):
+    # todo: WIP!!!
+    path = Path(path)
+    # path.chown(...)
+
+
 def split_file(file_path: Path | str, chunk_size, remove_on_failure=True):
     """
     Splits a file into multiple chunks of equal size (except for the last chunk).
@@ -848,11 +878,13 @@ def split_file(file_path: Path | str, chunk_size, remove_on_failure=True):
     bool: True if the operation is successful, False if an error occurs.
 
     Example:
+        ```
         success = split_file(Path('test.txt'), 10000)
         if success:
             print("File successfully split into chunks.")
         else:
             print("An error occurred while splitting the file.")
+        ```
     """
     file_path = Path(file_path)
     block_size = 64 * 1024  # 64 KB
@@ -924,6 +956,7 @@ def split_files_get_list(first_chunk_path):
 
     return chunk_files
 
+
 def combine_files(output_file_path: Path, chunk_files: List[Path]) -> bool:
     """
     Combines chunk files into a single output file.
@@ -958,6 +991,7 @@ def combine_files(output_file_path: Path, chunk_files: List[Path]) -> bool:
     except IOError:
         return False
 
+
 def file_list_calc_total_size(file_list: List[Path]) -> int:
     """
     Calculates the total size of all files in the given list.
@@ -970,7 +1004,6 @@ def file_list_calc_total_size(file_list: List[Path]) -> int:
     """
     total_size: int = sum(file.stat().st_size for file in file_list)
     return total_size
-
 
 
 # Run ################################################################
@@ -1055,6 +1088,7 @@ def run_command(command: str,
     - ValueError: If incompatible options are combined (e.g., both 'stdin_text' and 'stdin' are provided).
 
     Examples:
+        ```
         # Example 1: Capturing output of a command
         output = run_command('cat test.txt', capture_output=True)
         if output.stdout:
@@ -1075,6 +1109,7 @@ def run_command(command: str,
         output_process = run_command('cat test.txt', capture_output=True, background=True)
         grep_process = run_command('grep test_line', stdin=output_process.stdout)
         print(grep_process.stdout.read())
+        ```
 
     Note:
       To redirect redirect the output of the first application to the second application.
@@ -1243,6 +1278,7 @@ def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> list:
     See psutil documentation for more details on these attributes.
     https://psutil.readthedocs.io/en/latest/#psutil.Process.as_dict
     Examples:
+        ```
         # Get a list of all processes
         process_list = get_proc_list()
 
@@ -1255,6 +1291,7 @@ def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> list:
             ps_exec.update({Path(p['exe']): p['pid']})
 
         print(ps_exec)
+        ```
     """
     if psutil is None:
         raise ImportError("The psutil library is required but not installed. Install it using 'pip install psutil'")
@@ -1337,7 +1374,7 @@ def proc_list_to_dict(proc_list, attrs):
 def print_process_list_example(process_list, print_format="{:<8} {:<30} {:<10} {}"):
     """
     Example:
-    print_process_list(proc_list_to_dict(proc_list(), ['pid', 'username', 'cpu_times', 'cmdline']))
+    >>> print_process_list(proc_list_to_dict(proc_list(), ['pid', 'username', 'cpu_times', 'cmdline']))
     """
     print(print_format.format('PID', 'USER', 'TIME', 'COMMAND'))
 
@@ -1381,6 +1418,31 @@ def datetime_trim_ms(t: datetime | time) -> datetime | time:
     else:
         raise TypeError("Unsupported type for t. Expected datetime or time.")
 
+def datetime_trim_second(t: datetime | time) -> datetime | time:
+    """
+    Trims seconds from a datetime or time object.
+
+    Parameters:
+    - t (datetime | time): The datetime or time object from which seconds are to be trimmed.
+
+    Returns:
+    - datetime | time: A new datetime or time object without seconds.
+    """
+    if isinstance(t, datetime):
+        return datetime(t.year, t.month, t.day, t.hour, t.minute)
+    elif isinstance(t, time):
+        return time(t.hour, t.minute)
+    else:
+        raise TypeError("Unsupported type for t. Expected datetime or time.")
+
+def datetime_trim_time(t: datetime) -> datetime:
+    """
+    Trims time from a datetime object.
+    """
+    if isinstance(t, time):
+        return datetime(t.year, t.month, t.day)
+    else:
+        raise TypeError("Unsupported type for t. Expected datetime.")
 
 def get_datetime() -> datetime:
     """ Alias for the `now()` """
@@ -1405,3 +1467,5 @@ def contains_path_glob_pattern(input_string):
     glob_pattern = r'[*?[]'
     match = re.search(glob_pattern, input_string)
     return bool(match)
+
+
