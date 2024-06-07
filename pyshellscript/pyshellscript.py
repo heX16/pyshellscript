@@ -16,7 +16,7 @@ from subprocess import CompletedProcess, Popen
 import shutil
 import re
 import typing
-from typing import Any, Callable, Dict, Set, List, Optional
+from typing import Any, Callable, Dict, Set, List, Optional, Union
 import platform
 import pprint
 
@@ -25,6 +25,16 @@ try:
 except ImportError:
     psutil = None
 
+# Base ################################################################
+
+def pyshellscript_version():
+    return '0.2.2'
+
+# Global variable ################################################################
+
+# Error code after function call `run_command` or `sh`.
+# This variable is used after invoking `run_command` or `sh`.
+returncode = None
 
 # OS ################################################################
 
@@ -992,27 +1002,49 @@ def combine_files(output_file_path: Path, chunk_files: List[Path]) -> bool:
         return False
 
 
-def file_list_calc_total_size(file_list: List[Path]) -> int:
+def file_list_calc_total_size(file_list: List[Union[Path, str]]) -> int:
     """
     Calculates the total size of all files in the given list.
 
     Parameters:
-    file_list (List[Path]): List of Path objects representing the files.
+    file_list (List[Union[Path, str]]): List of Path objects or strings representing the files.
 
     Returns:
     int: Total size of the files in bytes.
     """
-    total_size: int = sum(file.stat().st_size for file in file_list)
-    return total_size
+    return sum(Path(file).stat().st_size for file in file_list)
+
+
+def file_list_filter(file_list: List[Union[Path, str]], existing=True, only_files=True, only_dir=False) -> List[Path]:
+    """
+    Filters the given list of files or directories based on specified criteria.
+
+    Parameters:
+    file_list (List[Union[Path, str]]): List of Path objects or strings representing the files or directories.
+    existing (bool): If True, include only existing files or directories. Default is True.
+    only_files (bool): If True, include only files. Default is True.
+    only_dir (bool): If True, include only directories. If set to True, only_files is ignored. Default is False.
+
+    Returns:
+    List[Path]: List of Path objects that match the specified criteria.
+    """
+    res = []
+    if only_dir:
+        only_files = False
+    for file_path in file_list:
+        if isinstance(file_path, str):
+            file_path = Path(file_path)
+        if existing and not file_path.exists():
+            continue
+        if only_files and not file_path.is_file():
+            continue
+        if only_dir and not file_path.is_dir():
+            continue
+        res.append(file_path)
+    return res
 
 
 # Run ################################################################
-
-
-# Error code after function call `run_command` or `sh`.
-# This variable is used after invoking `run_command` or `sh`.
-returncode = None
-
 
 def get_last_error() -> int | None:
     """
