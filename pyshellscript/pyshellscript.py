@@ -1491,6 +1491,110 @@ def delay(second: float):
     sleep(second)
 
 
+# Config ################################################################
+
+
+def dict_cast_values(dict_values: Dict[str, Any], default_values: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Recursively cast the dict values to the types of the default values.
+
+    Parameters:
+    dict_values (Dict[str, Any]): The values from the dict.
+    default_values (Dict[str, Any]): The default values with types.
+
+    Returns:
+    Dict[str, Any]: The dict values with casted types.
+    """
+    dict_values_casted = {}
+    for key, default_value in default_values.items():
+        value = dict_values.get(key, default_value)
+        if isinstance(default_value, bool):
+            casted_value = bool(value)
+        elif isinstance(default_value, int):
+            casted_value = int(value)
+        elif isinstance(default_value, float):
+            casted_value = float(value)
+        elif isinstance(default_value, Path):
+            casted_value = Path(value)
+        elif isinstance(default_value, dict) and isinstance(value, dict):
+            casted_value = cast_value(value, default_value)
+        else:
+            casted_value = value  # Keep as string or original type for other types
+        dict_values_casted[key] = casted_value
+    return dict_values_casted
+
+
+def load_config_from_yaml(config_file: Path, default_values: Dict[str, Any]) -> None:
+    """
+    Load config from YAML file or create with defaults. Set global variables.
+
+    Parameters:
+    config_file (Path): Path to YAML file
+    default_values (Dict[str, Any]): Default config values
+
+    Types handled: bool, int, float, Path, Dict. Others kept as strings.
+
+    Examples:
+    > load_config_from_yaml(Path('config.yaml'), {'debug': False, 'retries': 3})
+    > print(retries)
+    """
+
+    if not config_file.exists():
+        with open(config_file, 'w') as file:
+            yaml.dump(default_values, file)
+        print(f"Created default configuration file: {config_file}")
+        config = default_values
+    else:
+        with open(config_file, 'r') as file:
+            config = yaml.safe_load(file)
+
+    # Apply casting for all default values
+    casted_config = dict_cast_values(config, default_values)
+
+    for key, value in casted_config.items():
+        # Set the global variable
+        globals()[key] = value
+
+
+def load_config_from_ini(config_file: Path, default_values: Dict[str, Any], section_name: str = 'DEFAULT') -> None:
+    """
+    Load config from INI file or create with defaults. Set global variables.
+
+    Parameters:
+    config_file (Path): Path to INI file
+    default_values (Dict[str, Any]): Default config values
+    section_name (str): INI section name, default 'DEFAULT'
+
+    Types handled: bool, int, float, Path. Others kept as strings.
+
+    Examples:
+    > load_config_from_ini(Path('config.ini'), {'debug': False, 'retries': 3})
+    > print(retries)
+    """
+
+    import configparser
+
+    config = configparser.ConfigParser()
+
+    if not config_file.exists():
+        # Convert all values to strings for initial config creation
+        string_defaults = {k: str(v) for k, v in default_values.items()}
+        config[section_name] = string_defaults
+        with open(config_file, 'w') as configfile:
+            config.write(configfile)
+        print(f"Created default configuration file: {config_file}")
+    else:
+        config.read(config_file)
+
+    # Apply casting for all default values
+    casted_config = dict_cast_values(config[section_name], default_values)
+
+    for key, value in casted_config.items():
+        # Set the global variable
+        globals()[key] = value
+
+
+
 # Utils ################################################################
 
 
