@@ -1043,6 +1043,9 @@ def file_list_filter(file_list: List[Union[Path, str]], existing=True, only_file
         res.append(file_path)
     return res
 
+def file_list_sort_by_date(file_list: List[Union[Path, str]], reverse=False) -> List[Path]:
+    return sorted(file_list, key=lambda x: Path(x).stat().st_mtime, reverse=reverse)
+
 
 # Run ################################################################
 
@@ -1427,8 +1430,7 @@ def str_present(target_str: str, find_substr: str) -> bool:
 
 def get_filename(path: Path | str) -> Path:
     """ Extract filename (with extension) """
-    path = Path(path)
-    return Path(path.name)
+    return Path(Path(path).name)
 
 
 # Date time ################################################################
@@ -1538,6 +1540,8 @@ def load_config_from_yaml(config_file: Path, default_values: Dict[str, Any]) -> 
     > load_config_from_yaml(Path('config.yaml'), {'debug': False, 'retries': 3})
     > print(retries)
     """
+
+    import yaml
 
     if not config_file.exists():
         with open(config_file, 'w') as file:
