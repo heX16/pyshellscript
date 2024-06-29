@@ -39,6 +39,15 @@ returncode = None
 # OS ################################################################
 
 
+def get_current_script_name() -> Path:
+    """
+    Get the name of the current script file with extension.
+    """
+    # Note: Using `sys.argv[0]` instead of `__file__`
+    #   for better compatibility with command-line execution
+    return Path(os.path.basename(sys.argv[0]))
+
+
 def is_wnd() -> bool:
     """Check if the operating system is Windows."""
     return platform.system().lower() == 'windows'
@@ -1043,8 +1052,25 @@ def file_list_filter(file_list: List[Union[Path, str]], existing=True, only_file
         res.append(file_path)
     return res
 
+
 def file_list_sort_by_date(file_list: List[Union[Path, str]], reverse=False) -> List[Path]:
+    """ Function to sort files by modification date """
     return sorted(file_list, key=lambda x: Path(x).stat().st_mtime, reverse=reverse)
+
+
+def file_list_sort_by_size(file_list: List[Union[Path, str]], reverse=False) -> List[Path]:
+    """ Function to sort files by size """
+    return sorted(file_list, key=lambda x: Path(x).stat().st_size, reverse=reverse)
+
+
+def file_list_sort_by_name(file_list: List[Union[Path, str]], reverse=False) -> List[Path]:
+    """ Function to sort files by name """
+    return sorted(file_list, key=lambda x: Path(x).name.lower(), reverse=reverse)
+
+
+def file_list_sort_by_ext(file_list: List[Union[Path, str]], reverse=False) -> List[Path]:
+    """ Function to sort files by extension """
+    return sorted(file_list, key=lambda x: Path(x).suffix.lower(), reverse=reverse)
 
 
 # Run ################################################################
@@ -1546,7 +1572,7 @@ def load_config_from_yaml(config_file: Path, default_values: Dict[str, Any]) -> 
     if not config_file.exists():
         with open(config_file, 'w') as file:
             yaml.dump(default_values, file)
-        print(f"Created default configuration file: {config_file}")
+        print(f'Created default configuration file: {config_file}')
         config = default_values
     else:
         with open(config_file, 'r') as file:
@@ -1586,7 +1612,7 @@ def load_config_from_ini(config_file: Path, default_values: Dict[str, Any], sect
         config[section_name] = string_defaults
         with open(config_file, 'w') as configfile:
             config.write(configfile)
-        print(f"Created default configuration file: {config_file}")
+        print(f'Created default configuration file: {config_file}')
     else:
         config.read(config_file)
 
@@ -1597,6 +1623,39 @@ def load_config_from_ini(config_file: Path, default_values: Dict[str, Any], sect
         # Set the global variable
         globals()[key] = value
 
+
+def load_config_from_json(config_file: Path, default_values: Dict[str, Any]) -> None:
+    """
+    Load config from JSON file or create with defaults. Set global variables.
+
+    Parameters:
+    config_file (Path): Path to JSON file
+    default_values (Dict[str, Any]): Default config values
+
+    Types handled: bool, int, float, Path, Dict. Others kept as strings.
+
+    Examples:
+    > load_config_from_json(Path('config.json'), {'debug': False, 'retries': 3})
+    > print(retries)
+    """
+
+    import json
+
+    if not config_file.exists():
+        with open(config_file, 'w') as file:
+            json.dump(default_values, file, indent=4)
+        print(f"Created default configuration file: {config_file}")
+        config = default_values
+    else:
+        with open(config_file, 'r') as file:
+            config = json.load(file)
+
+    # Apply casting for all default values
+    casted_config = cast_value(config, default_values)
+
+    for key, value in casted_config.items():
+        # Set the global variable
+        globals()[key] = value
 
 
 # Utils ################################################################
