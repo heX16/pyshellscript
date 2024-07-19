@@ -3,31 +3,33 @@ import toml
 import re
 from pathlib import Path
 
-# Open and read the file
+# Path to the target Python file
 file_path = Path('pyshellscript/pyshellscript.py')
+
+# Read all lines from the file
 lines = file_path.read_text().splitlines()
 
 try:
-    # Find the index of the target line
+    # Find the index of the target function definition
     index = lines.index('def pyshellscript_version():')
-    # Print the line immediately following the target line
-    version = lines[index + 1]
+    # Get the line immediately following the target line
+    version_line = lines[index + 1]
 
     # Regular expression to extract the version number
-    match = re.search(r"return\s+'([\d.]+)'", version)
+    match = re.search(r"return\s+'([\d.]+)'", version_line)
     if match:
         version = match.group(1)
         print('Version:', version)
     else:
-        exit(1)
         print('No version found')
+        exit(1)
 
 except ValueError:
     print('The target line was not found in the file.')
+    exit(1)
 except IndexError:
     print('The target line is at the end of the file, no following line.')
-
-exit(0)
+    exit(1)
 
 # Path to the pyproject.toml file
 pyproject_path = Path('pyproject.toml')
@@ -36,10 +38,17 @@ pyproject_path = Path('pyproject.toml')
 with pyproject_path.open('r') as file:
     pyproject_data = toml.load(file)
 
-# Extract the version from pyproject.toml
-version = pyproject_data['project']['version']
+# Update the version in pyproject.toml
+pyproject_data['project']['version'] = version
+
+# Write the updated data back to pyproject.toml
+with pyproject_path.open('w') as file:
+    toml.dump(pyproject_data, file)
+
+# Extract the updated version from pyproject.toml
+project_version = pyproject_data['project']['version']
 dist_dir = Path('dist')
-wheel_file = dist_dir / f'pyshellscript-{version}-py3-none-any.whl'
+wheel_file = dist_dir / f'pyshellscript-{project_version}-py3-none-any.whl'
 
 # Build the project
 subprocess.run(['python', '-m', 'build'])
