@@ -38,12 +38,20 @@ pyproject_path = Path('pyproject.toml')
 with pyproject_path.open('r') as file:
     pyproject_data = toml.load(file)
 
-# Update the version in pyproject.toml
-pyproject_data['project']['version'] = version
+# Extract the current version from pyproject.toml
+current_version = pyproject_data['project']['version']
 
-# Write the updated data back to pyproject.toml
-with pyproject_path.open('w') as file:
-    toml.dump(pyproject_data, file)
+# Compare versions and update if different
+if version != current_version:
+    # Update the version in pyproject.toml
+    pyproject_data['project']['version'] = version
+
+    # Write the updated data back to pyproject.toml
+    with pyproject_path.open('w') as file:
+        toml.dump(pyproject_data, file)
+    print(f'Updated pyproject.toml to version: {version}')
+else:
+    print(f'No update needed. Current version is already: {current_version}')
 
 # Extract the updated version from pyproject.toml
 project_version = pyproject_data['project']['version']
