@@ -1,5 +1,4 @@
 import subprocess
-import toml
 import re
 from pathlib import Path
 
@@ -19,7 +18,7 @@ try:
     match = re.search(r"return\s+'([\d.]+)'", version_line)
     if match:
         version = match.group(1)
-        print('Version:', version)
+        print('Version "pyshellscript":', version)
     else:
         print('No version found')
         exit(1)
@@ -35,26 +34,29 @@ except IndexError:
 pyproject_path = Path('pyproject.toml')
 
 # Read the pyproject.toml file
-with pyproject_path.open('r') as file:
-    pyproject_data = toml.load(file)
+pyproject_text = pyproject_path.read_text()
 
-# Extract the current version from pyproject.toml
-current_version = pyproject_data['project']['version']
+# Regular expression to find the version line in pyproject.toml
+version_pattern = re.compile(r'version\s*=\s*"([\d.]+)"')
 
-# Compare versions and update if different
-if version != current_version:
-    # Update the version in pyproject.toml
-    pyproject_data['project']['version'] = version
-
-    # Write the updated data back to pyproject.toml
-    with pyproject_path.open('w') as file:
-        toml.dump(pyproject_data, file)
-    print(f'Updated pyproject.toml to version: {version}')
+# Find the current version in pyproject.toml
+current_version_match = version_pattern.search(pyproject_text)
+if current_version_match:
+    current_version = current_version_match.group(1)
+    if version != current_version:
+        # Replace the current version with the new version
+        updated_pyproject_text = version_pattern.sub(f'version = "{version}"', pyproject_text)
+        # Write the updated content back to pyproject.toml
+        pyproject_path.write_text(updated_pyproject_text)
+        print(f'Updated pyproject.toml to version: {version}')
+    else:
+        print(f'No update needed. Current version is already: {current_version}')
 else:
-    print(f'No update needed. Current version is already: {current_version}')
+    print('Version line not found in pyproject.toml')
+    exit(1)
 
 # Extract the updated version from pyproject.toml
-project_version = pyproject_data['project']['version']
+project_version = version
 dist_dir = Path('dist')
 wheel_file = dist_dir / f'pyshellscript-{project_version}-py3-none-any.whl'
 
