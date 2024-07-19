@@ -1024,7 +1024,7 @@ def file_list_calc_total_size(file_list: List[Union[Path, str]]) -> int:
     return sum(Path(file).stat().st_size for file in file_list)
 
 
-def file_list_filter(file_list: List[Union[Path, str]], existing=True, only_files=True, only_dir=False) -> List[Path]:
+def file_list_filter_by_flags(file_list: List[Union[Path, str]], existing=True, only_files=True, only_dir=False) -> List[Path]:
     """
     Filters the given list of files or directories based on specified criteria.
 
@@ -1051,6 +1051,14 @@ def file_list_filter(file_list: List[Union[Path, str]], existing=True, only_file
             continue
         res.append(file_path)
     return res
+
+
+def file_list_filter_by_substring(file_list: List[Union[Path, str]], substring: str, inverse: bool = False) -> List[Path]:
+    """
+    Filter a list of file paths by including only those that contain a given substring.
+    If inverse is True, exclude paths that contain the substring.
+    """
+    return list(map(Path, filter(lambda x: str_present(str(x), substring) != inverse, file_list)))
 
 
 def file_list_sort_by_date(file_list: List[Union[Path, str]], reverse=False) -> List[Path]:
@@ -1450,8 +1458,9 @@ def print_process_list_example(process_list, print_format="{:<8} {:<30} {:<10} {
 
 # Strings ################################################################
 
+
 def str_present(target_str: str, find_substr: str) -> bool:
-    return False if target_str.find(find_substr) == -1 else True
+    return find_substr in target_str
 
 
 def get_filename(path: Path | str) -> Path:
