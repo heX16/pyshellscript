@@ -25,16 +25,19 @@ try:
 except ImportError:
     psutil = None
 
+
 # Base ################################################################
 
 def pyshellscript_version():
     return '0.2.5'
+
 
 # Global variable ################################################################
 
 # Error code after function call `run_command` or `sh`.
 # This variable is used after invoking `run_command` or `sh`.
 returncode = None
+
 
 # OS ################################################################
 
@@ -138,6 +141,7 @@ def get_os_name() -> str:
         return _get_linux_distributive_name()
     else:
         return "Unknown operating system."
+
 
 # Files data ################################################################
 
@@ -476,8 +480,10 @@ def print_copy_progress(data: bytes, data_len: int, copied_size: int, file_size:
     :param copied_size: Total size of data copied so far.
     :param file_size: Total size of the file being copied.
     :param user_data: Dictionary to store user data `Dict{'last_print_time': 0.0}`, like the time of the last print.
-    :paran error_code: Error codes (not working - under development).
+    :param error_code: Error codes (not working - under development).
     """
+    if data is None:
+        return
     current_time = get_datetime().timestamp()
     last_print_time = user_data.get('last_print_time', 0.0)
     if current_time != last_print_time:  # Print every second
@@ -901,7 +907,8 @@ def get_create_time(file_path: Path | str) -> datetime:
     # On Unix-like systems, it returns the last metadata change on a file or directory.
     # For actual file creation date, this might not be accurate on Unix-like systems.
     # TODO: `Path.stat().birthtime`: Creation time(on some Unix systems in the FreeBSD family, including macOS)
-    # TODO: This method normally follows symlinks; to stat a symlink add the argument follow_symlinks=False, or use lstat().
+    # TODO: This method normally follows symlinks;
+    #  to stat a symlink add the argument follow_symlinks=False, or use lstat().
     creation_time = os.path.getctime(path)
     return datetime.fromtimestamp(creation_time)
 
@@ -1006,10 +1013,9 @@ def chmod(path: Path | str, mode, follow_symlinks=True):
     """
     Change the permissions of a file or directory.
 
-    Parameters:
-    path (Path | str): The path of the file or directory.
-    mode (int): The permissions to set. Should be an integer (e.g., 0o755).
-    follow_symlinks (bool): If False, and the path is a symbolic link, chmod modifies the symbolic link itself instead of the file it points to. Defaults to True.
+    Parameters: path (Path | str): The path of the file or directory. mode (int): The permissions to set. Should be
+    an integer (e.g., 0o755). follow_symlinks (bool): If False, and the path is a symbolic link, chmod modifies the
+    symbolic link itself instead of the file it points to. Defaults to True.
     """
     path = Path(path)
     path.chmod(mode=mode, follow_symlinks=follow_symlinks)
@@ -1094,7 +1100,7 @@ def split_files_get_list(first_chunk_path: Path | str) -> List[Path]:
     expected_size = first_chunk_path.stat().st_size
     for i, chunk_file in enumerate(chunk_files):
         current_size = chunk_file.stat().st_size
-        expected_suffix = f'.{(i+1):03d}'
+        expected_suffix = f'.{(i + 1):03d}'
         if chunk_file.suffix != expected_suffix:
             return []
         if i < len(chunk_files) - 1 and current_size != expected_size:
@@ -1119,30 +1125,28 @@ def file_list_calc_total_size(file_list: List[Union[Path, str]]) -> int:
 
 
 def file_list_filter_by_flags(
-    file_list: List[Union[Path, str]],
-    existing=True,
-    only_files=True,
-    only_dir=False,
-    readable=None,
-    writable=None,
-    executable=None,
-    hidden=None,
-    symlinks=None,
-    size_greater_than=None,
-    size_less_than=None,
-    modified_before=None,
-    modified_after=None,
-    extension=None,
-    file_type=None,
-    mtime_before=None,
-    mtime_after=None,
-    atime_before=None,
-    atime_after=None,
-    ctime_before=None,
-    ctime_after=None,
-    empty=None,
-    maxdepth=None,
-    mindepth=None
+        file_list: List[Union[Path, str]],
+        existing=True,
+        only_files=True,
+        only_dir=False,
+        readable=None,
+        writable=None,
+        executable=None,
+        hidden=None,
+        symlinks=None,
+        size_greater_than=None,
+        size_less_than=None,
+        modified_before=None,
+        modified_after=None,
+        extension=None,
+        file_type=None,
+        mtime_before=None,
+        mtime_after=None,
+        atime_before=None,
+        atime_after=None,
+        ctime_before=None,
+        ctime_after=None,
+        empty=None,
 ) -> List[Path]:
     """
     Filters the given list of files or directories based on specified criteria.
@@ -1162,7 +1166,7 @@ def file_list_filter_by_flags(
     modified_before (datetime, optional): Include only files modified before this date. Default is None.
     modified_after (datetime, optional): Include only files modified after this date. Default is None.
     extension (str, optional): Include only files with this extension. Default is None.
-    file_type (str, optional): Include only files of this type ('f' for files, 'd' for directories, 'l' for symlinks). Default is None.
+    file_type (str, optional): Include only files of this type ('f' for files, 'd' for directories, 'l' for symlinks).
     mtime_before (datetime, optional): Include only files modified before this date. Default is None.
     mtime_after (datetime, optional): Include only files modified after this date. Default is None.
     atime_before (datetime, optional): Include only files accessed before this date. Default is None.
@@ -1176,6 +1180,9 @@ def file_list_filter_by_flags(
     Returns:
     List[Path]: List of Path objects that match the specified criteria.
     """
+    # TODO: maxdepth = None,
+    # TODO: mindepth = None
+
     res = []
     if only_dir:
         only_files = False
@@ -1214,10 +1221,12 @@ def file_list_filter_by_flags(
         if size_less_than is not None and file_path.is_file() and file_path.stat().st_size >= size_less_than:
             continue
 
-        if modified_before is not None and file_path.is_file() and datetime.fromtimestamp(file_path.stat().st_mtime) >= modified_before:
+        if modified_before is not None and file_path.is_file() and datetime.fromtimestamp(
+                file_path.stat().st_mtime) >= modified_before:
             continue
 
-        if modified_after is not None and file_path.is_file() and datetime.fromtimestamp(file_path.stat().st_mtime) <= modified_after:
+        if modified_after is not None and file_path.is_file() and datetime.fromtimestamp(
+                file_path.stat().st_mtime) <= modified_after:
             continue
 
         if extension is not None and file_path.suffix != extension:
@@ -1259,10 +1268,10 @@ def file_list_filter_by_flags(
 
 
 def filter_by_user_group_perm(
-    file_list: List[Union[Path, str]],
-    user: Union[str, int, None] = None,
-    group: Union[str, int, None] = None,
-    perm: str = None
+        file_list: List[Union[Path, str]],
+        user: Union[str, int, None] = None,
+        group: Union[str, int, None] = None,
+        perm: str = None
 ) -> List[Path]:
     """
     Filters the given list of files or directories based on user, group, and permissions.
@@ -1313,7 +1322,8 @@ def filter_by_user_group_perm(
     return res
 
 
-def file_list_filter_by_substring(file_list: List[Union[Path, str]], substring: str, inverse: bool = False) -> List[Path]:
+def file_list_filter_by_substring(file_list: List[Union[Path, str]],
+                                  substring: str, inverse: bool = False) -> List[Path]:
     """
     Filter a list of file paths by including only those that contain a given substring.
     If inverse is True, exclude paths that contain the substring.
@@ -1381,7 +1391,7 @@ class RunFail(subprocess.CompletedProcess):
 class RunFailProcessPresent(subprocess.CompletedProcess):
 
     def __init__(self, args):
-        super().__init__(args, None)
+        super().__init__(args, -1)
 
 
 def run_command(command: str,
@@ -1397,11 +1407,14 @@ def run_command(command: str,
 
     Parameters:
     - command (str): The shell command to execute.
-    - capture_output (bool): Whether to capture the command's stdout and stderr. Defaults to False. If set to True, stdout
-      and stderr are captured and can be accessed via the process object or RunOk instance.
-    - stdin_text (str | bytes): Text or bytes to send to the stdin of the subprocess. This should not be used with 'stdin'.
-    - stdin (subprocess.PIPE or similar): The stdin stream for the subprocess. This should not be used together with 'stdin_text'.
-    - background (bool): Whether to run the command in the background. Defaults to False. If set to True, the function returns
+    - capture_output (bool): Whether to capture the command's stdout and stderr. Defaults to False.
+        If set to True, stdout and stderr are captured and can be accessed via the process object or RunOk instance.
+    - stdin_text (str | bytes): Text or bytes to send to the stdin of the subprocess.
+        This should not be used with 'stdin'.
+    - stdin (subprocess.PIPE or similar): The stdin stream for the subprocess.
+        This should not be used together with 'stdin_text'.
+    - background (bool): Whether to run the command in the background. Defaults to False.
+        If set to True, the function returns
       immediately with a subprocess.Popen object, and you will not receive captured output or a return code.
     - ensure_unique (bool): Ensure the command runs only if it's not already running. Defaults to False.
     - raise_exception (bool): Whether to raise an exception if the command is already running and ensure_unique is True.
@@ -1430,7 +1443,8 @@ def run_command(command: str,
 
         # Example 3: Pipe example (string version)
         output = run_command('cat test.txt', capture_output=True, raise_exception=True)
-        grep_output = run_command('grep test_line', capture_output=True, stdin_text=output.stdout.getvalue(), raise_exception=True)
+        grep_output = run_command('grep test_line', capture_output=True, stdin_text=output.stdout.getvalue(),
+            raise_exception=True)
         out_str = grep_output.stdout.read()
         print(out_str)
 
@@ -1630,20 +1644,20 @@ def get_proc_list(skip_system=True, skip_core=True, only_system=False) -> list:
         skip_system = False
     for p in psutil.process_iter():
         try:
-            sys = False
+            sys_proc = False
             u = p.username()
             if skip_core and (u is None):
                 continue
             if (u == 'NT AUTHORITY\\SYSTEM' or
                     u == 'NT AUTHORITY\\LOCAL SERVICE' or
                     u == 'NT AUTHORITY\\SYSTEM'):
-                sys = True
-            if skip_system and sys:
+                sys_proc = True
+            if skip_system and sys_proc:
                 continue
             cmd = p.cmdline()
             if skip_core and (cmd is None or cmd == ''):
                 continue
-            if only_system and not sys:
+            if only_system and not sys_proc:
                 continue
 
             result.append(p)
@@ -1685,7 +1699,8 @@ def proc_list_to_dict(proc_list, attrs):
 
     @param proc_list: list[psutil.Process] -- List of process objects from the psutil library.
     @param attrs: list[str] -- List of attributes to retrieve for each process.
-    @return: list[dict] -- List of dictionaries with keys as attributes and values as the corresponding process information.
+    @return: list[dict] -- List of dictionaries with keys as attributes and
+        values as the corresponding process information.
     """
     if psutil is None:
         raise ImportError('The psutil library is required but not installed. Install it using `pip install psutil`')
@@ -1698,22 +1713,6 @@ def proc_list_to_dict(proc_list, attrs):
             pass  # Ignore processes that could not be accessed or do not exist anymore
 
     return result
-
-
-def print_process_list_example(process_list, print_format="{:<8} {:<30} {:<10} {}"):
-    """
-    Example:
-    >>> print_process_list(proc_list_to_dict(proc_list(), ['pid', 'username', 'cpu_times', 'cmdline']))
-    """
-    print(print_format.format('PID', 'USER', 'TIME', 'COMMAND'))
-
-    for p in process_list:
-        print(print_format.format(
-            str(p['pid']),
-            str(p['username']),
-            round(p['cpu_times'].user + p['cpu_times'].system, 2),
-            '-' if p['cmdline'] is None else ' '.join(p['cmdline'])
-        ))
 
 
 # Strings ################################################################
@@ -1747,6 +1746,7 @@ def datetime_trim_ms(t: datetime | time) -> datetime | time:
     else:
         raise TypeError("Unsupported type for t. Expected datetime or time.")
 
+
 def datetime_trim_second(t: datetime | time) -> datetime | time:
     """
     Trims seconds from a datetime or time object.
@@ -1764,14 +1764,16 @@ def datetime_trim_second(t: datetime | time) -> datetime | time:
     else:
         raise TypeError("Unsupported type for t. Expected datetime or time.")
 
+
 def datetime_trim_time(t: datetime) -> datetime:
     """
     Trims time from a datetime object.
     """
-    if isinstance(t, time):
+    if isinstance(t, datetime):
         return datetime(t.year, t.month, t.day)
     else:
         raise TypeError("Unsupported type for t. Expected datetime.")
+
 
 def get_datetime() -> datetime:
     """ Alias for the `now()` """
@@ -1814,7 +1816,7 @@ def dict_cast_values(dict_values: Dict[str, Any], default_values: Dict[str, Any]
         elif isinstance(default_value, Path):
             casted_value = Path(value)
         elif isinstance(default_value, dict) and isinstance(value, dict):
-            casted_value = cast_value(value, default_value)
+            casted_value = dict_cast_values(value, default_value)
         else:
             casted_value = value  # Keep as string or original type for other types
         dict_values_casted[key] = casted_value
@@ -1886,7 +1888,7 @@ def load_config_from_ini(config_file: Path, default_values: Dict[str, Any], sect
         config.read(config_file)
 
     # Apply casting for all default values
-    casted_config = dict_cast_values(config[section_name], default_values)
+    casted_config = dict_cast_values(dict(config[section_name]), default_values)
 
     for key, value in casted_config.items():
         # Set the global variable
@@ -1920,7 +1922,7 @@ def load_config_from_json(config_file: Path, default_values: Dict[str, Any]) -> 
             config = json.load(file)
 
     # Apply casting for all default values
-    casted_config = cast_value(config, default_values)
+    casted_config = dict_cast_values(config, default_values)
 
     for key, value in casted_config.items():
         # Set the global variable
@@ -1935,5 +1937,3 @@ def contains_path_glob_pattern(input_string):
     glob_pattern = r'[*?[]'
     match = re.search(glob_pattern, input_string)
     return bool(match)
-
-
