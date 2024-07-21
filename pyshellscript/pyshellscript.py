@@ -1118,7 +1118,32 @@ def file_list_calc_total_size(file_list: List[Union[Path, str]]) -> int:
     return sum(Path(file).stat().st_size for file in file_list)
 
 
-def file_list_filter_by_flags(file_list: List[Union[Path, str]], existing=True, only_files=True, only_dir=False) -> List[Path]:
+def file_list_filter_by_flags(
+    file_list: List[Union[Path, str]],
+    existing=True,
+    only_files=True,
+    only_dir=False,
+    readable=None,
+    writable=None,
+    executable=None,
+    hidden=None,
+    symlinks=None,
+    size_greater_than=None,
+    size_less_than=None,
+    modified_before=None,
+    modified_after=None,
+    extension=None,
+    file_type=None,
+    mtime_before=None,
+    mtime_after=None,
+    atime_before=None,
+    atime_after=None,
+    ctime_before=None,
+    ctime_after=None,
+    empty=None,
+    maxdepth=None,
+    mindepth=None
+) -> List[Path]:
     """
     Filters the given list of files or directories based on specified criteria.
 
@@ -1127,6 +1152,26 @@ def file_list_filter_by_flags(file_list: List[Union[Path, str]], existing=True, 
     existing (bool): If True, include only existing files or directories. Default is True.
     only_files (bool): If True, include only files. Default is True.
     only_dir (bool): If True, include only directories. If set to True, only_files is ignored. Default is False.
+    readable (bool, optional): If True, include only readable files or directories. Default is None.
+    writable (bool, optional): If True, include only writable files or directories. Default is None.
+    executable (bool, optional): If True, include only executable files or directories. Default is None.
+    hidden (bool, optional): If True, include only hidden files or directories. Default is None.
+    symlinks (bool, optional): If True, include only symbolic links. Default is None.
+    size_greater_than (int, optional): Include only files larger than this size (in bytes). Default is None.
+    size_less_than (int, optional): Include only files smaller than this size (in bytes). Default is None.
+    modified_before (datetime, optional): Include only files modified before this date. Default is None.
+    modified_after (datetime, optional): Include only files modified after this date. Default is None.
+    extension (str, optional): Include only files with this extension. Default is None.
+    file_type (str, optional): Include only files of this type ('f' for files, 'd' for directories, 'l' for symlinks). Default is None.
+    mtime_before (datetime, optional): Include only files modified before this date. Default is None.
+    mtime_after (datetime, optional): Include only files modified after this date. Default is None.
+    atime_before (datetime, optional): Include only files accessed before this date. Default is None.
+    atime_after (datetime, optional): Include only files accessed after this date. Default is None.
+    ctime_before (datetime, optional): Include only files changed before this date. Default is None.
+    ctime_after (datetime, optional): Include only files changed after this date. Default is None.
+    empty (bool, optional): Include only empty files or directories. Default is None.
+    maxdepth (int, optional): Maximum depth of directories to include. Default is None.
+    mindepth (int, optional): Minimum depth of directories to include. Default is None.
 
     Returns:
     List[Path]: List of Path objects that match the specified criteria.
@@ -1134,15 +1179,81 @@ def file_list_filter_by_flags(file_list: List[Union[Path, str]], existing=True, 
     res = []
     if only_dir:
         only_files = False
+
     for file_path in file_list:
         if isinstance(file_path, str):
             file_path = Path(file_path)
+
         if existing and not file_path.exists():
             continue
+
         if only_files and not file_path.is_file():
             continue
+
         if only_dir and not file_path.is_dir():
             continue
+
+        if readable is not None and not os.access(file_path, os.R_OK):
+            continue
+
+        if writable is not None and not os.access(file_path, os.W_OK):
+            continue
+
+        if executable is not None and not os.access(file_path, os.X_OK):
+            continue
+
+        if hidden is not None and file_path.name.startswith('.') != hidden:
+            continue
+
+        if symlinks is not None and file_path.is_symlink() != symlinks:
+            continue
+
+        if size_greater_than is not None and file_path.is_file() and file_path.stat().st_size <= size_greater_than:
+            continue
+
+        if size_less_than is not None and file_path.is_file() and file_path.stat().st_size >= size_less_than:
+            continue
+
+        if modified_before is not None and file_path.is_file() and datetime.fromtimestamp(file_path.stat().st_mtime) >= modified_before:
+            continue
+
+        if modified_after is not None and file_path.is_file() and datetime.fromtimestamp(file_path.stat().st_mtime) <= modified_after:
+            continue
+
+        if extension is not None and file_path.suffix != extension:
+            continue
+
+        if file_type == 'f' and not file_path.is_file():
+            continue
+        elif file_type == 'd' and not file_path.is_dir():
+            continue
+        elif file_type == 'l' and not file_path.is_symlink():
+            continue
+
+        if mtime_before is not None and datetime.fromtimestamp(file_path.stat().st_mtime) >= mtime_before:
+            continue
+
+        if mtime_after is not None and datetime.fromtimestamp(file_path.stat().st_mtime) <= mtime_after:
+            continue
+
+        if atime_before is not None and datetime.fromtimestamp(file_path.stat().st_atime) >= atime_before:
+            continue
+
+        if atime_after is not None and datetime.fromtimestamp(file_path.stat().st_atime) <= atime_after:
+            continue
+
+        if ctime_before is not None and datetime.fromtimestamp(file_path.stat().st_ctime) >= ctime_before:
+            continue
+
+        if ctime_after is not None and datetime.fromtimestamp(file_path.stat().st_ctime) <= ctime_after:
+            continue
+
+        if empty and file_path.is_file() and file_path.stat().st_size != 0:
+            continue
+
+        if empty and file_path.is_dir() and any(file_path.iterdir()):
+            continue
+
         res.append(file_path)
     return res
 
