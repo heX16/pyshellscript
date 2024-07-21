@@ -28,7 +28,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.2.4'
+    return '0.2.5'
 
 # Global variable ################################################################
 
@@ -164,6 +164,100 @@ def get_file_content(file_name: str | Path, encoding='utf-8', ignore_io_error=Fa
             return ''
         else:
             raise
+
+
+def split_file(file_path: Path | str, chunk_size, remove_on_failure=True):
+    """
+    Splits a file into multiple chunks of equal size (except for the last chunk).
+
+    Parameters:
+    file_path (Path): Path to the input file.
+    chunk_size (int): Size of each chunk in bytes.
+    remove_on_failure (bool): If True, removes created chunks if an error occurs. Default is True.
+
+    Returns:
+    bool: True if the operation is successful, False if an error occurs.
+
+    See Also:
+        split_file, combine_files, split_files_get_list, file_list_calc_total_size
+
+    Example:
+        ```
+        success = split_file(Path('test.txt'), 10000)
+        if success:
+            print("File successfully split into chunks.")
+        else:
+            print("An error occurred while splitting the file.")
+        ```
+    """
+    file_path = Path(file_path)
+    block_size = 64 * 1024  # 64 KB
+    created_files = []
+    try:
+        with file_path.open('rb') as file:
+            chunk_num = 1
+            while True:
+                chunk_file_name = file_path.with_suffix(f".{chunk_num:03d}")
+                created_files.append(chunk_file_name)
+                with chunk_file_name.open('wb') as chunk_file:
+                    remaining_size = chunk_size
+                    while remaining_size > 0:
+                        block = file.read(min(block_size, remaining_size))
+                        if not block:
+                            break
+                        chunk_file.write(block)
+                        remaining_size -= len(block)
+                    if remaining_size > 0:
+                        break
+                chunk_num += 1
+        return True
+    except IOError:
+        if remove_on_failure:
+            for file_name in created_files:
+                try:
+                    file_name.unlink()
+                except OSError:
+                    pass
+        return False
+
+
+def combine_files(output_file_path: Path, chunk_files: List[Path]) -> bool:
+    """
+    Combines chunk files into a single output file.
+
+    Parameters:
+    output_file_path (Path): Path to the output file.
+    chunk_files (List[Path]): List of Path objects representing the chunk files.
+
+    Returns:
+    bool: True if the operation is successful, False if an error occurs.
+
+    See Also:
+        split_file, combine_files, split_files_get_list, file_list_calc_total_size
+
+    Example usage:
+    >>> from pathlib import Path
+    >>> files = [Path('file.txt.001'), Path('file.txt.002'), Path('file.txt.003'), Path('file.txt.004')]
+    >>> success = combine_files(Path('combined_file.txt'), files)
+    >>> if success:
+    >>>     print("Files successfully combined into one.")
+    >>> else:
+    >>>     print("An error occurred while combining the files.")
+    """
+    block_size = 64 * 1024  # 64 KB
+    try:
+        with output_file_path.open('wb') as output_file:
+            for chunk_file in chunk_files:
+                with chunk_file.open('rb') as file:
+                    while True:
+                        block = file.read(block_size)
+                        if not block:
+                            break
+                        output_file.write(block)
+        return True
+    except IOError:
+        return False
+
 
 # Files ################################################################
 
@@ -892,84 +986,92 @@ def set_create_time(file_path: Path | str, new_create_date: datetime):
 
 
 def touch(file: Path | str, mode=None, exist_ok=True):
-    # todo: doc
+    """
+    Create a new file at the specified path or update the modification time if the file already exists.
+
+    Parameters:
+    file (Path | str): The path of the file to be created or touched.
+    mode (int, optional): The permissions to set on the newly created file. Defaults to None.
+    exist_ok (bool): If False, raises a FileExistsError if the file already exists. Defaults to True.
+
+    Note:
+    This function uses Path.touch from the pathlib module to create the file. The mode parameter
+    is only effective if the file is created; it does not change the permissions of an existing file.
+    """
     file = Path(file)
     file.touch(mode=mode, exist_ok=exist_ok)
 
 
 def chmod(path: Path | str, mode, follow_symlinks=True):
-    # todo: WIP!!!
+    """
+    Change the permissions of a file or directory.
+
+    Parameters:
+    path (Path | str): The path of the file or directory.
+    mode (int): The permissions to set. Should be an integer (e.g., 0o755).
+    follow_symlinks (bool): If False, and the path is a symbolic link, chmod modifies the symbolic link itself instead of the file it points to. Defaults to True.
+    """
     path = Path(path)
     path.chmod(mode=mode, follow_symlinks=follow_symlinks)
 
 
-def chown(path: Path | str, owner):
-    # todo: WIP!!!
-    path = Path(path)
-    # path.chown(...)
-
-
-def split_file(file_path: Path | str, chunk_size, remove_on_failure=True):
+def chown(path: Path | str, user: str | int | None = None, group: str | int | None = None):
     """
-    Splits a file into multiple chunks of equal size (except for the last chunk).
+    Change the owner and group of a file or directory.
 
     Parameters:
-    file_path (Path): Path to the input file.
-    chunk_size (int): Size of each chunk in bytes.
-    remove_on_failure (bool): If True, removes created chunks if an error occurs. Default is True.
+    path (Path | str): The path of the file or directory.
+    user (str | int, optional): The name or ID of the user to set as the owner. Defaults to None.
+    group (str | int, optional): The name or ID of the group to set. Defaults to None.
 
-    Returns:
-    bool: True if the operation is successful, False if an error occurs.
-
-    Example:
-        ```
-        success = split_file(Path('test.txt'), 10000)
-        if success:
-            print("File successfully split into chunks.")
-        else:
-            print("An error occurred while splitting the file.")
-        ```
+    Note:
+    This function uses `os.chown` to change the file owner and group.
+    If either user or group is None, the corresponding ownership is not changed.
+    If a user or group name is provided, it will be resolved to the corresponding ID.
+    This function only works on Linux systems.
     """
-    file_path = Path(file_path)
-    block_size = 64 * 1024  # 64 KB
-    created_files = []
-    try:
-        with file_path.open('rb') as file:
-            chunk_num = 1
-            while True:
-                chunk_file_name = file_path.with_suffix(f".{chunk_num:03d}")
-                created_files.append(chunk_file_name)
-                with chunk_file_name.open('wb') as chunk_file:
-                    remaining_size = chunk_size
-                    while remaining_size > 0:
-                        block = file.read(min(block_size, remaining_size))
-                        if not block:
-                            break
-                        chunk_file.write(block)
-                        remaining_size -= len(block)
-                    if remaining_size > 0:
-                        break
-                chunk_num += 1
-        return True
-    except IOError:
-        if remove_on_failure:
-            for file_name in created_files:
-                try:
-                    file_name.unlink()
-                except OSError:
-                    pass
-        return False
+    if not is_linux():
+        raise OSError('This function is only supported on Linux systems.')
+
+    import pwd
+    import grp
+
+    path = Path(path)
+
+    # Get current ownership
+    stat_info = path.lstat()
+    uid = stat_info.st_uid
+    gid = stat_info.st_gid
+
+    # Get new user ID if user is specified
+    if user is not None:
+        if isinstance(user, int):
+            uid = user
+        else:
+            uid = pwd.getpwnam(user).pw_uid
+
+    # Get new group ID if group is specified
+    if group is not None:
+        if isinstance(group, int):
+            gid = group
+        else:
+            gid = grp.getgrnam(group).gr_gid
+
+    os.chown(path, uid, gid)
 
 
-def split_files_get_list(first_chunk_path):
+def split_files_get_list(first_chunk_path: Path | str) -> List[Path]:
     """
     Verifies and lists chunk files in the directory of the given first chunk file.
 
     Parameters:
-    first_chunk_path (Path): Path to the first chunk file (e.g., 'file.txt.001').
+    first_chunk_path (Path): Path to the first chunk file. Must be '*.001' (e.g., 'file.txt.001').
 
     Returns:
     list: List of Path objects representing the chunk files if conditions are met, otherwise an empty list.
+
+    See Also:
+        split_file, combine_files, split_files_get_list, file_list_calc_total_size
     """
     first_chunk_path = Path(first_chunk_path)
 
@@ -981,11 +1083,10 @@ def split_files_get_list(first_chunk_path):
 
     base_name_no_ext = base_name.rsplit('.', 1)[0]
 
-    # Filtering and sorting files by numeric extension, ensuring three-digit extensions only
-    chunk_files = sorted(
-        filter(lambda f: f.suffix[1:].isdigit() and len(f.suffix[1:]) == 3, directory.glob(f"{base_name_no_ext}.*")),
-        key=lambda f: int(f.suffix[1:])
-    )
+    # Search, filtering and sorting files by numeric extension, ensuring three-digit extensions only
+    chunk_files = directory.glob(f'{base_name_no_ext}.*')
+    chunk_files = filter(lambda f: f.suffix[1:].isdigit() and len(f.suffix[1:]) == 3, chunk_files)
+    chunk_files = sorted(chunk_files, key=lambda f: int(f.suffix[1:]))
 
     if not chunk_files:
         return []
@@ -993,47 +1094,15 @@ def split_files_get_list(first_chunk_path):
     expected_size = first_chunk_path.stat().st_size
     for i, chunk_file in enumerate(chunk_files):
         current_size = chunk_file.stat().st_size
+        expected_suffix = f'.{(i+1):03d}'
+        if chunk_file.suffix != expected_suffix:
+            return []
         if i < len(chunk_files) - 1 and current_size != expected_size:
-            return False
+            return []
         elif i == len(chunk_files) - 1 and current_size > expected_size:
-            return False
+            return []
 
     return chunk_files
-
-
-def combine_files(output_file_path: Path, chunk_files: List[Path]) -> bool:
-    """
-    Combines chunk files into a single output file.
-
-    Parameters:
-    output_file_path (Path): Path to the output file.
-    chunk_files (List[Path]): List of Path objects representing the chunk files.
-
-    Returns:
-    bool: True if the operation is successful, False if an error occurs.
-
-    Example usage:
-    >>> from pathlib import Path
-    >>> files = [Path('file.txt.001'), Path('file.txt.002'), Path('file.txt.003'), Path('file.txt.004')]
-    >>> success = combine_files(Path('combined_file.txt'), files)
-    >>> if success:
-    >>>     print("Files successfully combined into one.")
-    >>> else:
-    >>>     print("An error occurred while combining the files.")
-    """
-    block_size = 64 * 1024  # 64 KB
-    try:
-        with output_file_path.open('wb') as output_file:
-            for chunk_file in chunk_files:
-                with chunk_file.open('rb') as file:
-                    while True:
-                        block = file.read(block_size)
-                        if not block:
-                            break
-                        output_file.write(block)
-        return True
-    except IOError:
-        return False
 
 
 def file_list_calc_total_size(file_list: List[Union[Path, str]]) -> int:
