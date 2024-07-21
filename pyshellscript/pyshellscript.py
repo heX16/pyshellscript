@@ -139,6 +139,31 @@ def get_os_name() -> str:
     else:
         return "Unknown operating system."
 
+# Files data ################################################################
+
+def get_file_content(file_name: str | Path, encoding='utf-8', ignore_io_error=False) -> str:
+    """
+    Reads the content of a file and returns it as a string.
+
+    Args:
+        file_name (str | Path): The name or path of the file to read.
+        encoding (str): The encoding to use when reading the file. Defaults to 'utf-8'.
+        ignore_io_error (bool): If True, returns an empty string on IOError. Defaults to False.
+
+    Returns:
+        str: The content of the file, or an empty string if an IOError occurs and ignore_io_error is True.
+
+    Note:
+        If the file is too large, calling this function will consume a lot of memory.
+    """
+    try:
+        with open(file_name, 'r', encoding=encoding) as f:
+            return str(f.read())
+    except IOError:
+        if ignore_io_error:
+            return ''
+        else:
+            raise
 
 # Files ################################################################
 
