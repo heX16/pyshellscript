@@ -1147,6 +1147,61 @@ def file_list_filter_by_flags(file_list: List[Union[Path, str]], existing=True, 
     return res
 
 
+def filter_by_user_group_perm(
+    file_list: List[Union[Path, str]],
+    user: Union[str, int, None] = None,
+    group: Union[str, int, None] = None,
+    perm: str = None
+) -> List[Path]:
+    """
+    Filters the given list of files or directories based on user, group, and permissions.
+
+    Parameters:
+    file_list (List[Union[Path, str]]): List of Path objects or strings representing the files or directories.
+    user (str | int, optional): The user name or ID to filter by. Default is None.
+    group (str | int, optional): The group name or ID to filter by. Default is None.
+    perm (str, optional): The permission string to filter by (e.g., '755'). Default is None.
+
+    Returns:
+    List[Path]: List of Path objects that match the specified criteria.
+    """
+    import pwd
+    import grp
+
+    res = []
+
+    for file_path in file_list:
+        if isinstance(file_path, str):
+            file_path = Path(file_path)
+
+        if user is not None:
+            uid = file_path.stat().st_uid
+            if isinstance(user, int):
+                if uid != user:
+                    continue
+            else:
+                if uid != pwd.getpwnam(user).pw_uid:
+                    continue
+
+        if group is not None:
+            gid = file_path.stat().st_gid
+            if isinstance(group, int):
+                if gid != group:
+                    continue
+            else:
+                if gid != grp.getgrnam(group).gr_gid:
+                    continue
+
+        if perm is not None:
+            mode = oct(file_path.stat().st_mode)[-3:]
+            if mode != perm:
+                continue
+
+        res.append(file_path)
+
+    return res
+
+
 def file_list_filter_by_substring(file_list: List[Union[Path, str]], substring: str, inverse: bool = False) -> List[Path]:
     """
     Filter a list of file paths by including only those that contain a given substring.
