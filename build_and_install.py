@@ -1,3 +1,5 @@
+# Note: For obvious reasons, this file does not use `pyshellscript` library functions.
+
 import subprocess
 import re
 from pathlib import Path
@@ -15,6 +17,7 @@ try:
     version_line = lines[index + 1]
 
     # Regular expression to extract the version number
+    # Example: `return '0.2.5'` -> `0.2.5`
     match = re.search(r"return\s+'([\d.]+)'", version_line)
     if match:
         version = match.group(1)
@@ -26,8 +29,8 @@ try:
 except ValueError:
     print('The target line was not found in the file.')
     exit(1)
-except IndexError:
-    print('The target line is at the end of the file, no following line.')
+except Exception as e:
+    print(f'Error: {e}')
     exit(1)
 
 # Path to the pyproject.toml file
