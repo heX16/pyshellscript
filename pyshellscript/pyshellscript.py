@@ -4,21 +4,20 @@
 # author: heX
 # url: https://github.com/heX16
 
-from pathlib import Path
 import os
 import sys
-import stat
 import io
+import shutil
+import subprocess
+import platform
+import re
+import stat
+import typing
+from pathlib import Path
 from time import sleep
 from datetime import datetime, time, date, timedelta
-import subprocess
 from subprocess import CompletedProcess, Popen
-import shutil
-import re
-import typing
 from typing import Any, Callable, Dict, Set, List, Optional, Union
-import platform
-import pprint
 
 try:
     import psutil  # pip install psutil
@@ -166,6 +165,32 @@ def get_file_content(file_name: str | Path, encoding='utf-8', ignore_io_error=Fa
     except IOError:
         if ignore_io_error:
             return ''
+        else:
+            raise
+
+
+def save_file_content(file_name: str | Path, content: str, encoding='utf-8', ignore_io_error=False) -> None:
+    """
+    Saves the given content to a file.
+
+    Args:
+        file_name (str | Path): The name or path of the file to write to.
+        content (str): The content to write into the file.
+        encoding (str): The encoding to use when writing to the file. Defaults to 'utf-8'.
+        ignore_io_error (bool): If True, suppresses IOError. Defaults to False.
+
+    Returns:
+        None
+
+    Note:
+        If the file is too large, this function might consume a lot of memory when writing.
+    """
+    try:
+        with open(file_name, 'w', encoding=encoding) as f:
+            f.write(content)
+    except IOError:
+        if ignore_io_error:
+            pass
         else:
             raise
 
