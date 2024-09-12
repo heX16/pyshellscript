@@ -3,33 +3,31 @@ import subprocess
 class ShellCommand:
     def __init__(self, command):
         self.command = command
+        self.process = None
         self.output = None
 
-    def run(self):
-        # Execute the command and save the output
-        result = subprocess.run(self.command, shell=True, capture_output=True, text=True)
-        self.output = result.stdout
+    def run(self, input_data=None):
+        # Выполняем команду с возможностью передачи входных данных через PIPE
+        if input_data is not None:
+            self.process = subprocess.Popen(self.command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+            self.output, _ = self.process.communicate(input=input_data)
+        else:
+            self.process = subprocess.Popen(self.command, shell=True, stdout=subprocess.PIPE, text=True)
+            self.output, _ = self.process.communicate()
+
         return self
 
     def __rshift__(self, other):
-        # Ensure the command has already been executed and the output is not empty
+        # Убедимся, что команда выполнена, если не было выполнено до этого
         if self.output is None:
             self.run()
 
-        # Redirect the output to the next command
+        # Передаем вывод следующей команде
         if isinstance(other, ShellCommand):
-            other.input_from(self.output)
-            return other.run()
+            return other.run(input_data=self.output)
         elif isinstance(other, SaveToFile):
             other.write_to_file(self.output)
             return other
-
-    def input_from(self, input_text):
-        # Get data from the previous command
-        if input_text is not None:
-            self.command = f'echo "{input_text.strip()}" | {self.command}'
-        return self
-
 
 class SaveToFile:
     def __init__(self, filename):
@@ -40,13 +38,13 @@ class SaveToFile:
             file.write(data)
 
     def __rshift__(self, other):
-        # For the ability to continue the chain after saving the file (e.g., to other objects)
+        # Для возможности продолжать цепочку после сохранения файла
         return other
 
 
-# Example of usage
+# Пример использования
 sh = ShellCommand
 save_to_file = SaveToFile
 
-#sh('ping test.com') >> sh('find "Reply"') >> save_to_file('log.txt')
-sh('ping test.com') >> save_to_file('log.txt')
+sh('ping 127.0.0.1') >> sh('find "Reply"') >> save_to_file('log.txt')
+#sh('ping 127.0.0.1') >> save_to_file('log.txt')
