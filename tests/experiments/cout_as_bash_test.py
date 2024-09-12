@@ -20,27 +20,27 @@ class ShellCommand:
         """
         self.command = command
         self.process = None
-        self.output = None
 
-    def run(self, input_data=None):
+    def run(self, input_process=None):
         """
-        Executes the command. If input_data is provided, it is passed to the
-        command via stdin.
+        Executes the command. If input_process is provided, its output is passed
+        as stdin to the command.
 
         Args:
-            input_data (str, optional): The input data to pass to the command.
+            input_process (subprocess.Popen, optional): The process whose output
+            is piped to this command's input.
 
         Returns:
             ShellCommand: Returns self to allow method chaining.
         """
-        # Execute the command with input data passed via PIPE if provided
-        if input_data is not None:
-            self.process = subprocess.Popen(self.command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-            self.output, _ = self.process.communicate(input=input_data)
-        else:
-            self.process = subprocess.Popen(self.command, shell=True, stdout=subprocess.PIPE, text=True)
-            self.output, _ = self.process.communicate()
-
+        # Execute the command with stdin set to the output of the input process if provided
+        self.process = subprocess.Popen(
+            self.command,
+            shell=True,
+            stdin=input_process.stdout if input_process else None,
+            stdout=subprocess.PIPE,
+            text=True
+        )
         return self
 
     def __rshift__(self, other):
@@ -55,16 +55,15 @@ class ShellCommand:
         Returns:
             ShellCommand or SaveToFile: The resulting object after piping.
         """
-        # Ensure the command has been executed if not already
-        if self.output is None:
-            self.run()
-
-        # If the next object is a ShellCommand, pipe the output to it
+        # Pipe output directly to the next command
         if isinstance(other, ShellCommand):
-            return other.run(input_data=self.output)
-        # If the next object is SaveToFile, write the output to the file
+            return other.run(input_process=self.process)
         elif isinstance(other, SaveToFile):
-            other.write_to_file(self.output)
+            if self.process is None:
+                self.run()
+            self.process.wait()  # Wait for the process to finish
+            output, _ = self.process.communicate()  # Capture the output
+            other.write_to_file(output)
             return other
 
 
