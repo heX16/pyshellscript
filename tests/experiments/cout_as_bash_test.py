@@ -7,6 +7,7 @@ class ShellCommand:
         self.process = None
         print(f'INIT: {self.command}')
 
+
     def run(self, input_process=None):
         # Execute the command with stdin set to the output of the input process if provided
         print(f'RUN: {self.command}')
@@ -19,21 +20,30 @@ class ShellCommand:
         )
         return self
 
-    def __rshift__(self, other):
-        # Pipe output directly to the next command
 
+    def pipe_the_process(self, second_process):
         if self.process is None:
             self.run()
 
-        if isinstance(other, ShellCommand):
-            print(f'self - {self.command}, other - {other.command}')
-            other.run(self.process)
-        elif isinstance(other, SaveToFile):
-            print(f'self - {self.command}, other - SaveToFile')
-            other.stdout_write_to_file(self)
+        if isinstance(second_process, ShellCommand):
+            print(f'self - {self.command}, second_process - {second_process.command}')
+            second_process.run(self.process)
+        elif isinstance(second_process, SaveToFile):
+            print(f'self - {self.command}, second_process - SaveToFile')
+            second_process.stdout_write_to_file(self)
         else:
             print('ERROR')
-        return other
+
+        return second_process
+
+
+    def __rshift__(self, other):
+        # Pipe output directly to the next command
+        return self.pipe_the_process(other)
+
+    def __or__(self, other):
+        # Pipe output directly to the next command
+        return self.pipe_the_process(other)
 
 
 class SaveToFile:
@@ -44,14 +54,17 @@ class SaveToFile:
     def stdout_write_to_file(self, process):
         stdout, stderr = process.process.communicate()  # Capture the output
         code = process.process.wait()  # Wait for the process to finish
-        print(code)
+        # print(code)
         with open(self.filename, 'w') as file:
             file.write(stdout)
 
     def __rshift__(self, other):
-        print(f'self - SaveToFile:{self.filename}, other - ...')
+        print(f'self (rshift) - SaveToFile:{self.filename}, other - ...')
         return other
 
+    def __or__(self, other):
+        print(f'self (or) - SaveToFile:{self.filename}, other - ...')
+        return other
 
 # Example usage
 sh = ShellCommand
