@@ -28,7 +28,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.2.5'
+    return '0.2.6'
 
 
 # Global variable ################################################################
@@ -1798,6 +1798,32 @@ def datetime_trim_time(t: datetime) -> datetime:
         return datetime(t.year, t.month, t.day)
     else:
         raise TypeError("Unsupported type for t. Expected datetime.")
+
+
+def datetime_to_yyyy_mm_dd(time: Union[datetime, date], delimiter: str = '-') -> str:
+    """
+    Convert time to 'YYYY-MM-DD' format.
+    Example:
+        > datetime_to_yyyy_mm_dd(now())
+        > '2024-12-16'
+    """
+    if isinstance(time, (datetime, date)):
+        return time.strftime(f'%Y{delimiter}%m{delimiter}%d')
+    else:
+        raise TypeError('Invalid type: expected datetime or date.')
+
+
+def datetime_to_hh_mm_ss(time: Union[datetime, time], delimiter: str = '-') -> str:
+    """
+    Convert time to 'HH-MM-SS' format.
+    Example:
+        > datetime_to_hh_mm_ss(datetime.now(), delimiter=':')
+        > '08:16:32'
+    """
+    if isinstance(time, (datetime, time)):
+        return time.strftime(f'%H{delimiter}%M{delimiter}%S')
+    else:
+        raise TypeError('Invalid type: expected datetime or time.')
 
 
 def get_datetime() -> datetime:
