@@ -1744,7 +1744,10 @@ def proc_list_to_dict(proc_list, attrs):
 
 
 def str_present(target_str: str, find_substr: str) -> bool:
-    return find_substr in target_str
+    if isinstance(target_str, str) and isinstance(find_substr, str):
+        return find_substr in target_str
+    else:
+        raise TypeError("Unsupported type")
 
 
 def get_filename(path: Path | str) -> Path:
@@ -1826,6 +1829,19 @@ def datetime_to_hh_mm_ss(time: Union[datetime, time], delimiter: str = '-') -> s
         raise TypeError('Invalid type: expected datetime or time.')
 
 
+def datetime_to_hh_mm(time: Union[datetime, time], delimiter: str = '-') -> str:
+    """
+    Convert time to 'HH-MM' format.
+    Example:
+        > datetime_to_hh_mm(datetime.now(), delimiter=':')
+        > '08:16'
+    """
+    if isinstance(time, (datetime, time)):
+        return time.strftime(f'%H{delimiter}%M')
+    else:
+        raise TypeError('Invalid type: expected datetime or time.')
+
+
 def get_datetime() -> datetime:
     """ Alias for the `now()` """
     return datetime.now()
@@ -1839,6 +1855,172 @@ def now() -> datetime:
 def delay(second: float):
     """ Alias for the `sleep()` """
     sleep(second)
+
+
+def _regex_build_delimiter_pattern(delimiter: Union[str, List[str]]) -> str:
+    """ Helper function to construct non-capturing regex pattern for delimiters """
+    if isinstance(delimiter, list):
+        escaped_delimiters = [re.escape(d) for d in delimiter]
+        return '(?:' + '|'.join(escaped_delimiters) + ')'
+    elif isinstance(delimiter, str):
+        return re.escape(delimiter)
+    else:
+        raise TypeError('Delimiter must be a string or a list of strings.')
+
+
+def datetime_parse_iso(
+    s: str,
+    raise_exception: bool = False,
+    delimiter_date: Union[str, List[str]] = ['-', '/'],
+    delimiter_time: Union[str, List[str]] = ['-', ':'],
+    delimiter_date_time: Union[str, List[str]] = [' ', '_', '-', 'T'],
+    require_start: bool = False,
+    require_end: bool = False
+) -> Union[datetime, None]:
+    """
+    Parses a string that contains a date and time in the format 'YYYY-MM-DD HH-MM-SS'.
+    Seconds are optional.
+
+    Args:
+    - s (str): The string to parse.
+    - raise_exception: If True, raises an exception on parsing errors.
+        If False, returns None on failure.
+    - delimiter_date: Delimiters used between date components (year, month, day).
+        Can be a single string or a list of strings.
+    - delimiter_time: Delimiters used between time components (hour, minute, second).
+        Can be a single string or a list of strings.
+    - delimiter_date_time: Delimiters used between the date and time parts.
+        Can be a single string or a list of strings.
+    - require_start: If True, the date must be at the start of the string (adds '^').
+        Default is False.
+    - require_end: If True, the date must be at the end of the string (adds '$').
+        Default is False.
+
+    Returns: A datetime object if parsing is successful, else None.
+
+    Raises:
+    - ValueError: If the string does not match the expected format or contains invalid date/time.
+    - TypeError: If the delimiter parameters are neither strings nor lists of strings.
+    """
+
+    try:
+        # Build the regex patterns for each delimiter
+        d_1 = _regex_build_delimiter_pattern(delimiter_date)
+        d_2 = _regex_build_delimiter_pattern(delimiter_time)
+        d_3 = _regex_build_delimiter_pattern(delimiter_date_time)
+
+        # Start building the pattern based on the user's options
+        pattern = ''
+        if require_start:
+            pattern += '^'  # Add '^' to enforce start of string
+
+        # Regular expression to match the date and time prefix with optional seconds
+        pattern += (
+            rf'(\d\d\d\d){d_1}(\d\d){d_1}(\d\d)'  # Date part: YYYY{delimiter_date}MM{delimiter_date}DD
+            f'{d_3}'                             # Delimiter between date and time
+            rf'(\d\d){d_2}(\d\d)'                # Time part: HH{delimiter_time}MM
+            rf'(?:{d_2}(\d\d))?'                 # Optional seconds: {delimiter_time}SS
+        )
+
+        if require_end:
+            pattern += '$'  # Add '$' to enforce end of string
+
+        # Match the string using the generated pattern
+        match = re.match(pattern, s)
+        if not match:
+            if raise_exception:
+                raise ValueError('String does not match the expected datetime format.')
+            return None
+
+        # Extract matched groups
+        year, month, day, hour, minute, second = match.groups()
+
+        # Convert matched strings to integers
+        year = int(year)
+        month = int(month)
+        day = int(day)
+        hour = int(hour)
+        minute = int(minute)
+        second = int(second) if second is not None else 0  # Default to 0 if seconds are missing
+
+        # Create and return the datetime object
+        return datetime(year, month, day, hour, minute, second)
+
+    except TypeError:
+        raise
+    except:
+        if raise_exception:
+            raise
+        return None
+
+
+def datetime_parse_multiple_formats(s: str, raise_exception: bool = False) -> Optional[datetime]:
+    """
+    Parses a string that may contain a date and time in various formats.
+    """
+    # Define common regex patterns
+    yyyy = r'(?P<year>\d{4})'
+    yy = r'(?P<year>\d{2})'
+    mm = r'(?P<month>\d{2})'
+    dd = r'(?P<day>\d{2})'
+    hh = r'(?P<hour>\d{2})'
+    mn = r'(?P<minute>\d{2})'
+    ss = r'(?P<second>\d{2})'
+    d_d = r'([-/.])'
+    d_dt = r'([ _-])'
+    d_t = r'([:-])'
+
+    datetime_regexes = [
+        # Format: YYYYMMDD_HHMMSS or YYYYMMDD_HHMM
+        rf'{yyyy}{mm}{dd}{d_dt}{hh}{mn}(?:{ss})?',
+
+        # Format: YYYY-MM-DD HH:MM[:SS], delimiters must be the same
+        rf'{yyyy}{d_d}{mm}\2{dd}{d_dt}{hh}{d_t}{mn}(?:\5{ss})?',
+
+        # Format: YY-MM-DD HH:MM[:SS], delimiters must be the same
+        rf'{yy}{d_d}{mm}\2{dd}{d_dt}{hh}{d_t}{mn}(?:\5{ss})?',
+
+        # Format: DD-MM-YYYY HH:MM[:SS], delimiters must be the same
+        rf'{dd}{d_d}{mm}\2{yyyy}{d_dt}{hh}{d_t}{mn}(?:\5{ss})?',
+
+        # Format: YYYY-MM-DD, date only
+        rf'{yyyy}{d_d}{mm}\2{dd}',
+
+        # Format: YYYYMMDD, date only
+        rf'{yyyy}{mm}{dd}',
+    ]
+
+    for regex in datetime_regexes:
+        match = re.search(regex, s)
+        if match:
+            try:
+                groups = match.groupdict()
+                # Extract components with default values
+                year_str = groups.get('year')
+                month = int(groups.get('month'))
+                day = int(groups.get('day'))
+                hour = int(groups.get('hour', '0'))
+                minute = int(groups.get('minute', '0'))
+                second = int(groups.get('second', '0'))
+
+                # Adjust year based on length of the year string
+                if len(year_str) == 2:
+                    year = int(year_str) + 2000  # Adjust as needed
+                else:
+                    year = int(year_str)
+
+                # Create and return the datetime object
+                return datetime(year, month, day, hour, minute, second)
+
+            except Exception as e:
+                if raise_exception:
+                    raise ValueError(f"Error parsing datetime: {e}")
+                return None
+
+    # If no regex matched
+    if raise_exception:
+        raise ValueError("No matching datetime format found.")
+    return None
 
 
 # Config ################################################################
