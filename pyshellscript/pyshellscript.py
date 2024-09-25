@@ -1912,7 +1912,8 @@ def datetime_parse(
     require_start: Union[str, bool] = False,
     require_end: Union[str, bool] = False,
     iso: bool = False,
-    iso_basic: bool = False
+    iso_basic: bool = False,
+    no_time: bool = False,
 ) -> Optional[datetime]:
     """
     Parses a string containing a date and time in various formats into a `datetime` object.
@@ -2018,10 +2019,10 @@ def datetime_parse(
     # Define common regex patterns
     yyyy = r'(?P<year>\d{4})'
     yy = r'(?P<year>\d{2})'
-    mm = r'(?P<month>\d{2})'
+    mm = r'(?P<month>[0-1][0-9])'
     dd = r'(?P<day>\d{2})'
-    hh = r'(?P<hour>\d{2})'
-    mn = r'(?P<minute>\d{2})'
+    hh = r'(?P<hour>[0-2][0-9])'
+    mn = r'(?P<minute>[0-5][0-9])'
     ss = r'(?P<second>\d{2})'
 
     # Build the regex patterns for each delimiter
@@ -2056,7 +2057,7 @@ def datetime_parse(
         f'{yyyy}{d_d}{mm}(?P=d_d){dd}{d_dt}{hh}{d_t}{mn}',
     ]
 
-    datetime_regexes_iso_alien = [
+    datetime_regexes_iso_compact = [
         # YYYYMMDD_HHMMSS   (iso, timestamp, basic version)
         f'{yyyy}{mm}{dd}{d_dt}{hh}{mn}{ss}',
 
@@ -2064,23 +2065,15 @@ def datetime_parse(
         f'{yyyy}{mm}{dd}{d_dt}{hh}{mn}',
     ]
 
-    datetime_regexes = [
-        *datetime_regexes_iso_human,
-
+    datetime_regexes_short_year = [
         # YY-MM-DD_HH:MM:SS
         f'{yy}{d_d}{mm}(?P=d_d){dd}{d_dt}{hh}{d_t}{mn}(?P=d_t){ss}',
 
         # YY-MM-DD_HH:MM
         f'{yy}{d_d}{mm}(?P=d_d){dd}{d_dt}{hh}{d_t}{mn}',
+    ]
 
-        # YYYY-MM-DD   (date only)
-        f'{yyyy}{d_d}{mm}(?P=d_d){dd}',
-
-        *datetime_regexes_iso_alien,
-
-        # YYYYMMDD   (date only)
-        f'{yyyy}{mm}{dd}',
-
+    datetime_regexes_day_first_strange_format = [
         # DD-MM-YYYY_HH:MM:SS
         f'{dd}{d_d}{mm}(?P=d_d){yyyy}{d_dt}{hh}{d_t}{mn}(?P=d_t){ss}',
 
@@ -2088,12 +2081,35 @@ def datetime_parse(
         f'{dd}{d_d}{mm}(?P=d_d){yyyy}{d_dt}{hh}{d_t}{mn}',
     ]
 
+    datetime_regexes_date_only = [
+        # YYYY-MM-DD   (date only)
+        f'{yyyy}{d_d}{mm}(?P=d_d){dd}',
+
+        # YYYYMMDD   (date only)
+        f'{yyyy}{mm}{dd}',
+    ]
+
+    if no_time is False:
+        datetime_regexes_date_only = []
+
+    datetime_regexes = [
+        *datetime_regexes_iso_human,
+
+        *datetime_regexes_iso_compact,
+
+        *datetime_regexes_short_year,
+
+        *datetime_regexes_date_only,
+
+        *datetime_regexes_day_first_strange_format,
+    ]
+
     if iso:
         datetime_regexes = datetime_regexes_iso_human
         iso_basic = False
 
     if iso_basic:
-        datetime_regexes = datetime_regexes_iso_alien
+        datetime_regexes = datetime_regexes_iso_compact
 
     for regex in datetime_regexes:
         match = re.search(start_pattern + regex + end_pattern, s)

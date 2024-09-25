@@ -66,7 +66,7 @@ class TestDatetimeParse(unittest.TestCase):
 
         # Format: YYYY-MM-DD (date only)
         self.assertEqual(
-            datetime_parse("2022-12-31"),
+            datetime_parse("2022-12-31", no_time=True),
             datetime(2022, 12, 31)
         )
 
@@ -84,7 +84,7 @@ class TestDatetimeParse(unittest.TestCase):
 
         # Format: YYYYMMDD (date only)
         self.assertEqual(
-            datetime_parse("20221231"),
+            datetime_parse("20221231", no_time=True),
             datetime(2022, 12, 31)
         )
 
@@ -152,19 +152,19 @@ class TestDatetimeParse(unittest.TestCase):
 
         # Date at the start of the string
         self.assertEqual(
-            datetime_parse("2022-12-31 data", require_start=True),
+            datetime_parse("2022-12-31 data", require_start=True, no_time=True),
             datetime(2022, 12, 31)
         )
 
         # Date at the end of the string
         self.assertEqual(
-            datetime_parse("data 2022-12-31", require_end=True),
+            datetime_parse("data 2022-12-31", require_end=True, no_time=True),
             datetime(2022, 12, 31)
         )
 
         # Date in the middle of the string
         self.assertIsNone(
-            datetime_parse("data 2022-12-31 data", require_start=True, require_end=True)
+            datetime_parse("data 2022-12-31 data", require_start=True, require_end=True, no_time=True)
         )
 
         # Two-digit year with rollover
@@ -194,13 +194,13 @@ class TestDatetimeParse(unittest.TestCase):
 
         # Custom require_start and require_end patterns
         self.assertEqual(
-            datetime_parse("Start2022-12-31End", require_start='Start', require_end='End'),
+            datetime_parse("Start2022-12-31End", require_start='Start', require_end='End', no_time=True),
             datetime(2022, 12, 31)
         )
 
         # Invalid custom require_start and require_end patterns
         self.assertIsNone(
-            datetime_parse("Start2022-12-31", require_start='Start', require_end='End')
+            datetime_parse("Start2022-12-31", require_start='Start', require_end='End', no_time=True)
         )
 
         # Using multiple delimiters
@@ -233,11 +233,11 @@ class TestDatetimeParse(unittest.TestCase):
 
         # Invalid type for delimiter_date
         with self.assertRaises(TypeError):
-            datetime_parse("2022-12-31", delimiter_date=123)
+            datetime_parse("2022-12-31", delimiter_date=123, no_time=True)
 
         # Invalid type for require_start
         with self.assertRaises(TypeError):
-            datetime_parse("2022-12-31", require_start=123)
+            datetime_parse("2022-12-31", require_start=123, no_time=True)
 
     def test_performance(self):
         # Test with a large number of dates to check performance
@@ -275,11 +275,11 @@ class TestDatetimeParse(unittest.TestCase):
         )
 
         self.assertIsNone(
-            datetime_parse("1234567890")
+            datetime_parse("1234567890", no_time=True)
         )
 
         self.assertIsNone(
-            datetime_parse("2022/13/31")  # Invalid month
+            datetime_parse("2022/13/31", no_time=True)  # Invalid month
         )
 
 # Run the tests
