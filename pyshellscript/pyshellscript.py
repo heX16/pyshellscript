@@ -1803,6 +1803,40 @@ def datetime_trim_time(t: datetime) -> datetime:
         raise TypeError("Unsupported type for t. Expected datetime.")
 
 
+def datetime_to_yyyy_mm_dd_hh_mm_ss(
+        time: Union[datetime, date],
+        delimiter_date: str = '-',
+        delimiter_time: str = ':',
+        delimiter_date_time: str = ' ') -> str:
+    """
+    Convert time to 'YYYY-MM-DD HH:MM:SS' format.
+    """
+    if isinstance(time, (datetime, date)):
+        d_t = delimiter_time
+        d_d = delimiter_date
+        d_dt = delimiter_date_time
+        return time.strftime(f'%Y{d_d}%m{d_d}%d %H{d_t}%M{d_t}%S')
+    else:
+        raise TypeError('Invalid type: expected datetime or date.')
+
+
+def datetime_to_yyyy_mm_dd_hh_mm(
+        time: Union[datetime, date],
+        delimiter_date: str = '-',
+        delimiter_time: str = ':',
+        delimiter_date_time: str = ' ') -> str:
+    """
+    Convert time to 'YYYY-MM-DD HH:MM' format.
+    """
+    if isinstance(time, (datetime, date)):
+        d_t = delimiter_time
+        d_d = delimiter_date
+        d_dt = delimiter_date_time
+        return time.strftime(f'%Y{d_d}%m{d_d}%d %H{d_t}%M')
+    else:
+        raise TypeError('Invalid type: expected datetime or date.')
+
+
 def datetime_to_yyyy_mm_dd(time: Union[datetime, date], delimiter: str = '-') -> str:
     """
     Convert time to 'YYYY-MM-DD' format.
@@ -1858,110 +1892,26 @@ def delay(second: float):
 
 
 def _regex_build_delimiter_pattern(delimiter: Union[str, List[str]]) -> str:
-    """ Helper function to construct non-capturing regex pattern for delimiters """
+    """ Helper function to construct regex pattern for delimiters """
     if isinstance(delimiter, list):
         escaped_delimiters = [re.escape(d) for d in delimiter]
-        return '(?:' + '|'.join(escaped_delimiters) + ')'
+        return '(' + '|'.join(escaped_delimiters) + ')'
     elif isinstance(delimiter, str):
         return re.escape(delimiter)
     else:
         raise TypeError('Delimiter must be a string or a list of strings.')
 
 
-def datetime_parse_iso(
+def datetime_parse(
     s: str,
     raise_exception: bool = False,
     delimiter_date: Union[str, List[str]] = ['-', '/'],
     delimiter_time: Union[str, List[str]] = ['-', ':'],
     delimiter_date_time: Union[str, List[str]] = [' ', '_', '-', 'T'],
-    require_start: bool = False,
-    require_end: bool = False
-) -> Union[datetime, None]:
-    """
-    Parses a string that contains a date and time in the format 'YYYY-MM-DD HH-MM-SS'.
-    Seconds are optional.
-
-    Args:
-    - s (str): The string to parse.
-    - raise_exception: If True, raises an exception on parsing errors.
-        If False, returns None on failure.
-    - delimiter_date: Delimiters used between date components (year, month, day).
-        Can be a single string or a list of strings.
-    - delimiter_time: Delimiters used between time components (hour, minute, second).
-        Can be a single string or a list of strings.
-    - delimiter_date_time: Delimiters used between the date and time parts.
-        Can be a single string or a list of strings.
-    - require_start: If True, the date must be at the start of the string (adds '^').
-        Default is False.
-    - require_end: If True, the date must be at the end of the string (adds '$').
-        Default is False.
-
-    Returns: A datetime object if parsing is successful, else None.
-
-    Raises:
-    - ValueError: If the string does not match the expected format or contains invalid date/time.
-    - TypeError: If the delimiter parameters are neither strings nor lists of strings.
-    """
-
-    try:
-        # Build the regex patterns for each delimiter
-        d_1 = _regex_build_delimiter_pattern(delimiter_date)
-        d_2 = _regex_build_delimiter_pattern(delimiter_time)
-        d_3 = _regex_build_delimiter_pattern(delimiter_date_time)
-
-        # Start building the pattern based on the user's options
-        pattern = ''
-        if require_start:
-            pattern += '^'  # Add '^' to enforce start of string
-
-        # Regular expression to match the date and time prefix with optional seconds
-        pattern += (
-            rf'(\d\d\d\d){d_1}(\d\d){d_1}(\d\d)'  # Date part: YYYY{delimiter_date}MM{delimiter_date}DD
-            f'{d_3}'                             # Delimiter between date and time
-            rf'(\d\d){d_2}(\d\d)'                # Time part: HH{delimiter_time}MM
-            rf'(?:{d_2}(\d\d))?'                 # Optional seconds: {delimiter_time}SS
-        )
-
-        if require_end:
-            pattern += '$'  # Add '$' to enforce end of string
-
-        # Match the string using the generated pattern
-        match = re.match(pattern, s)
-        if not match:
-            if raise_exception:
-                raise ValueError('String does not match the expected datetime format.')
-            return None
-
-        # Extract matched groups
-        year, month, day, hour, minute, second = match.groups()
-
-        # Convert matched strings to integers
-        year = int(year)
-        month = int(month)
-        day = int(day)
-        hour = int(hour)
-        minute = int(minute)
-        second = int(second) if second is not None else 0  # Default to 0 if seconds are missing
-
-        # Create and return the datetime object
-        return datetime(year, month, day, hour, minute, second)
-
-    except TypeError:
-        raise
-    except:
-        if raise_exception:
-            raise
-        return None
-
-
-def datetime_parse_multiple_formats(
-    s: str,
-    raise_exception: bool = False,
-    delimiter_date: Union[str, List[str]] = ['-', '/', ''],
-    delimiter_time: Union[str, List[str]] = ['-', ':', ''],
-    delimiter_date_time: Union[str, List[str]] = [' ', '_', '-', 'T'],
-    require_start: bool = False,
-    require_end: bool = False
+    require_start: Union[str, bool] = False,
+    require_end: Union[str, bool] = False,
+    iso: bool = False,
+    iso_basic: bool = False
 ) -> Optional[datetime]:
     """
     Parses a string that may contain a date and time in various formats.
@@ -2004,28 +1954,52 @@ def datetime_parse_multiple_formats(
     d_dt = _regex_build_delimiter_pattern(delimiter_date_time)
 
     # Optionally enforce start and end of string
-    start_pattern = '^' if require_start else ''
-    end_pattern = '$' if require_end else ''
+    if require_start == True:
+        start_pattern = '^'
+    elif require_start == False:
+        start_pattern = ''
+    elif isinstance(require_start, str):
+        start_pattern = require_start
+    else:
+        raise TypeError('require_start must be a string or bool.')
+
+    if require_end == True:
+        end_pattern = '^'
+    elif require_end == False:
+        end_pattern = ''
+    elif isinstance(require_end, str):
+        end_pattern = require_end
+    else:
+        raise TypeError('require_end must be a string or bool.')
 
     datetime_regexes = [
-        # Format: YYYYMMDD_HHMMSS or YYYYMMDD_HHMM
-        rf'{yyyy}{mm}{dd}{d_dt}?{hh}{mn}(?:{ss})?',
+        # YYYY-MM-DD_HH:MM[:SS]   (iso, human version)
+        f'{yyyy}{d_d}{mm}\\2{dd}{d_dt}{hh}{d_t}{mn}\\7{ss}?',
 
-        # Format: YYYY-MM-DD HH:MM[:SS], delimiters must be the same
-        rf'{yyyy}{d_d}{mm}\2{dd}{d_dt}{hh}{d_t}{mn}(?:\5{ss})?',
+        # YY-MM-DD_HH:MM[:SS]
+        f'{yy}{d_d}{mm}\\2{dd}{d_dt}{hh}{d_t}{mn}\\7{ss}?',
 
-        # Format: YY-MM-DD HH:MM[:SS], delimiters must be the same
-        rf'{yy}{d_d}{mm}\2{dd}{d_dt}{hh}{d_t}{mn}(?:\5{ss})?',
+        # DD-MM-YYYY_HH:MM[:SS]
+        f'{dd}{d_d}{mm}\\2{yyyy}{d_dt}{hh}{d_t}{mn}\\7{ss}?',
 
-        # Format: DD-MM-YYYY HH:MM[:SS], delimiters must be the same
-        rf'{dd}{d_d}{mm}\2{yyyy}{d_dt}{hh}{d_t}{mn}(?:\5{ss})?',
+        # YYYY-MM-DD   (date only)
+        f'{yyyy}{d_d}{mm}\\2{dd}',
 
-        # Format: YYYY-MM-DD, date only
-        rf'{yyyy}{d_d}{mm}\2{dd}',
+        # YYYYMMDD_HHMMSS   (iso, timestamp, basic version)
+        f'{yyyy}{mm}{dd}{d_dt}{hh}{mn}{ss}',
 
-        # Format: YYYYMMDD, date only
-        rf'{yyyy}{mm}{dd}',
+        # YYYYMMDD_HHMM
+        f'{yyyy}{mm}{dd}{d_dt}{hh}{mn}',
+
+        # YYYYMMDD   (date only)
+        f'{yyyy}{mm}{dd}',
     ]
+
+    if iso:
+        datetime_regexes = [datetime_regexes[0]]
+
+    if iso_basic:
+        datetime_regexes = [datetime_regexes[4]]
 
     for regex in datetime_regexes:
         match = re.search(start_pattern + regex + end_pattern, s)
