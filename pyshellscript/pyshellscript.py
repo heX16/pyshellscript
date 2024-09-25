@@ -28,7 +28,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.2.6'
+    return '0.2.7'
 
 
 # Global variable ################################################################
@@ -1891,13 +1891,14 @@ def delay(second: float):
     sleep(second)
 
 
-def _regex_build_delimiter_pattern(delimiter: Union[str, List[str]]) -> str:
+def _regex_build_delimiter_pattern(delimiters: Union[str, List[str]], group_name) -> str:
     """ Helper function to construct regex pattern for delimiters """
-    if isinstance(delimiter, list):
-        escaped_delimiters = [re.escape(d) for d in delimiter]
-        return '(' + '|'.join(escaped_delimiters) + ')'
-    elif isinstance(delimiter, str):
-        return re.escape(delimiter)
+    if isinstance(delimiters, str):
+        delimiters = [delimiters]
+
+    if isinstance(delimiters, list):
+        escaped_delimiters = [re.escape(d) for d in delimiters]
+        return f'(?P<{group_name}>' + '|'.join(escaped_delimiters) + ')'
     else:
         raise TypeError('Delimiter must be a string or a list of strings.')
 
@@ -2024,9 +2025,9 @@ def datetime_parse(
     ss = r'(?P<second>\d{2})'
 
     # Build the regex patterns for each delimiter
-    d_d = _regex_build_delimiter_pattern(delimiter_date)
-    d_t = _regex_build_delimiter_pattern(delimiter_time)
-    d_dt = _regex_build_delimiter_pattern(delimiter_date_time)
+    d_d = _regex_build_delimiter_pattern(delimiter_date, 'd_d')
+    d_t = _regex_build_delimiter_pattern(delimiter_time, 'd_t')
+    d_dt = _regex_build_delimiter_pattern(delimiter_date_time, 'd_dt')
 
     # Optionally enforce start and end of string
     if require_start == True:
@@ -2039,7 +2040,7 @@ def datetime_parse(
         raise TypeError('require_start must be a string or bool.')
 
     if require_end == True:
-        end_pattern = '^'
+        end_pattern = '$'
     elif require_end == False:
         end_pattern = ''
     elif isinstance(require_end, str):
@@ -2047,34 +2048,52 @@ def datetime_parse(
     else:
         raise TypeError('require_end must be a string or bool.')
 
-    datetime_regexes = [
-        # YYYY-MM-DD_HH:MM[:SS]   (iso, human version)
-        f'{yyyy}{d_d}{mm}\\2{dd}{d_dt}{hh}{d_t}{mn}\\7{ss}?',
+    datetime_regexes_iso_human = [
+        # YYYY-MM-DD_HH:MM:SS   (iso, human version)
+        f'{yyyy}{d_d}{mm}(?P=d_d){dd}{d_dt}{hh}{d_t}{mn}(?P=d_t){ss}',
 
-        # YY-MM-DD_HH:MM[:SS]
-        f'{yy}{d_d}{mm}\\2{dd}{d_dt}{hh}{d_t}{mn}\\7{ss}?',
+        # YYYY-MM-DD_HH:MM   (iso, human version)
+        f'{yyyy}{d_d}{mm}(?P=d_d){dd}{d_dt}{hh}{d_t}{mn}',
+    ]
 
-        # DD-MM-YYYY_HH:MM[:SS]
-        f'{dd}{d_d}{mm}\\2{yyyy}{d_dt}{hh}{d_t}{mn}\\7{ss}?',
-
-        # YYYY-MM-DD   (date only)
-        f'{yyyy}{d_d}{mm}\\2{dd}',
-
+    datetime_regexes_iso_alien = [
         # YYYYMMDD_HHMMSS   (iso, timestamp, basic version)
         f'{yyyy}{mm}{dd}{d_dt}{hh}{mn}{ss}',
 
-        # YYYYMMDD_HHMM
+        # YYYYMMDD_HHMM   (iso, timestamp, basic version)
         f'{yyyy}{mm}{dd}{d_dt}{hh}{mn}',
+    ]
+
+    datetime_regexes = [
+        *datetime_regexes_iso_human,
+
+        # YY-MM-DD_HH:MM:SS
+        f'{yy}{d_d}{mm}(?P=d_d){dd}{d_dt}{hh}{d_t}{mn}(?P=d_t){ss}',
+
+        # YY-MM-DD_HH:MM
+        f'{yy}{d_d}{mm}(?P=d_d){dd}{d_dt}{hh}{d_t}{mn}',
+
+        # YYYY-MM-DD   (date only)
+        f'{yyyy}{d_d}{mm}(?P=d_d){dd}',
+
+        *datetime_regexes_iso_alien,
 
         # YYYYMMDD   (date only)
         f'{yyyy}{mm}{dd}',
+
+        # DD-MM-YYYY_HH:MM:SS
+        f'{dd}{d_d}{mm}(?P=d_d){yyyy}{d_dt}{hh}{d_t}{mn}(?P=d_t){ss}',
+
+        # DD-MM-YYYY_HH:MM
+        f'{dd}{d_d}{mm}(?P=d_d){yyyy}{d_dt}{hh}{d_t}{mn}',
     ]
 
     if iso:
-        datetime_regexes = [datetime_regexes[0]]
+        datetime_regexes = datetime_regexes_iso_human
+        iso_basic = False
 
     if iso_basic:
-        datetime_regexes = [datetime_regexes[4]]
+        datetime_regexes = datetime_regexes_iso_alien
 
     for regex in datetime_regexes:
         match = re.search(start_pattern + regex + end_pattern, s)
