@@ -1914,31 +1914,106 @@ def datetime_parse(
     iso_basic: bool = False
 ) -> Optional[datetime]:
     """
-    Parses a string that may contain a date and time in various formats.
+    Parses a string containing a date and time in various formats into a `datetime` object.
 
-    Args:
-    - s (str): The string to parse.
-    - raise_exception (bool): If True, raises an exception on parsing errors.
-                              If False, returns None on failure.
-    - delimiter_date (Union[str, List[str]]): Delimiters used between date components (year, month, day).
-                                              Can be a single string or a list of strings.
-    - delimiter_time (Union[str, List[str]]): Delimiters used between time components (hour, minute, second).
-                                              Can be a single string or a list of strings.
-    - delimiter_date_time (Union[str, List[str]]): Delimiters used between the date and time parts.
-                                                  Can be a single string or a list of strings.
-    - require_start (bool): If True, the date must be at the start of the string (adds '^').
-                            Default is False.
-    - require_end (bool): If True, the date must be at the end of the string (adds '$').
-                          Default is False.
+    Parameters
+    ----------
+    s : str
+        The string to parse.
+    raise_exception : bool, optional
+        If `True`, raises an exception on parsing errors.
+        If `False`, returns `None` on failure.
+        Default is `False`.
+    delimiter_date : Union[str, List[str]], optional
+        Delimiters used between date components (year, month, day).
+        Can be a single string or a list of strings.
+        Default is `['-', '/']`.
+    delimiter_time : Union[str, List[str]], optional
+        Delimiters used between time components (hour, minute, second).
+        Can be a single string or a list of strings.
+        Default is `['-', ':']`.
+    delimiter_date_time : Union[str, List[str]], optional
+        Delimiters used between the date and time parts.
+        Can be a single string or a list of strings.
+        Default is `[' ', '_', '-', 'T']`.
+    require_start : Union[str, bool], optional
+        If `True`, the date must be at the start of the string (adds `^` in regex).
+        If `False`, no requirement.
+        If a string, it is used as the starting pattern in regex.
+        Default is `False`.
+    require_end : Union[str, bool], optional
+        If `True`, the date must be at the end of the string (adds `$` in regex).
+        If `False`, no requirement.
+        If a string, it is used as the ending pattern in regex.
+        Default is `False`.
+    iso : bool, optional
+        If `True`, only matches ISO 8601 format (`YYYY-MM-DD HH:MM[:SS]`).
+        Default is `False`.
+    iso_basic : bool, optional
+        If `True`, only matches basic ISO 8601 format without delimiters (`YYYYMMDDHHMMSS`).
+        Default is `False`.
 
-    Returns:
-    - Optional[datetime]: A datetime object if parsing is successful, else None.
+    Returns
+    -------
+    Optional[datetime]
+        A `datetime` object if parsing is successful, otherwise `None`.
 
-    Raises:
-    - ValueError: If the string does not match any expected format or contains invalid date/time.
-    - TypeError: If the delimiter parameters are neither strings nor lists of strings.
+    Raises
+    ------
+    ValueError
+        If the string does not match any expected format or contains invalid date/time,
+        and `raise_exception` is `True`.
+    TypeError
+        If any of the delimiter parameters are neither strings nor lists of strings.
+
+    Notes
+    -----
+    - The function attempts to parse the input string using multiple date and time formats.
+      It returns the first successfully parsed `datetime` object.
+    - If `iso` is set to `True`, only the standard ISO 8601 format (`YYYY-MM-DD HH:MM[:SS]`)
+      is considered during parsing.
+    - If `iso_basic` is set to `True`, only the basic ISO 8601 format without delimiters
+      (`YYYYMMDDHHMMSS`) is considered.
+    - If `require_start` or `require_end` are strings, they are directly used in the regex
+      patterns to enforce custom start or end conditions.
+    - Two-digit years are assumed to be in the 2000s. For example, `'21'` becomes `2021`.
+    - Delimiters can be customized to match various date and time formats.
+
+    Examples
+    --------
+    Basic usage:
+
+    >>> datetime_parse("2022-12-31 23:59:59")
+    datetime.datetime(2022, 12, 31, 23, 59, 59)
+
+    Using custom delimiters:
+
+    >>> datetime_parse("2022/12/31_23-59", delimiter_date='/', delimiter_time='-')
+    datetime.datetime(2022, 12, 31, 23, 59)
+
+    Enforcing start and end of string:
+
+    >>> datetime_parse("Log at 2022-12-31 23:59", require_start=True)
+    None
+
+    >>> datetime_parse("2022-12-31 23:59 Log", require_end=True)
+    None
+
+    Parsing ISO 8601 basic format:
+
+    >>> datetime_parse("20221231T235959", delimiter_date_time='T', iso_basic=True)
+    datetime.datetime(2022, 12, 31, 23, 59, 59)
+
+    Handling parsing errors:
+
+    >>> datetime_parse("Invalid date", raise_exception=False)
+    None
+
+    >>> datetime_parse("Invalid date", raise_exception=True)
+    Traceback (most recent call last):
+        ...
+    ValueError: No matching datetime format found.
     """
-
     # Define common regex patterns
     yyyy = r'(?P<year>\d{4})'
     yy = r'(?P<year>\d{2})'
