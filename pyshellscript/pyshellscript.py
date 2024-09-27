@@ -28,7 +28,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.2.7'
+    return '0.2.8'
 
 
 # Global variable ################################################################
@@ -909,11 +909,11 @@ def get_file_size(file_path: Path | str) -> int:
     return file_path.stat().st_size
 
 
-def get_last_modified_time(file_path: Path | str) -> datetime:
+def get_file_write_time(file_path: Path | str) -> datetime:
     return datetime.fromtimestamp(Path(file_path).stat().st_mtime)
 
 
-def set_last_modified_time(file_path: Path | str, new_last_modified: datetime):
+def set_file_write_time(file_path: Path | str, new_last_modified: datetime):
     file_path = Path(file_path)
 
     if not file_path.exists() or not file_path.is_file():
@@ -926,7 +926,7 @@ def set_last_modified_time(file_path: Path | str, new_last_modified: datetime):
     os.utime(file_path, (timestamp, timestamp))
 
 
-def get_create_time(file_path: Path | str) -> datetime:
+def get_file_create_time(file_path: Path | str) -> datetime:
     path = Path(file_path)
     # On Windows, `os.path.getctime()` returns the creation date.
     # On Unix-like systems, it returns the last metadata change on a file or directory.
@@ -938,7 +938,7 @@ def get_create_time(file_path: Path | str) -> datetime:
     return datetime.fromtimestamp(creation_time)
 
 
-def set_create_time(file_path: Path | str, new_create_date: datetime):
+def set_file_create_time(file_path: Path | str, new_create_date: datetime):
     """
     Set the creation date of a file.
     Note: This function might not work as expected on Unix-like systems.
