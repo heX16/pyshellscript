@@ -1,38 +1,85 @@
 from typing import List
+from enum import Enum
 
 
 class StrProcBase:
     def input(self, s: str) -> (str | None):
         raise NotImplementedError("Subclasses should implement this method")
 
-    def eof():
+    def eof(self):
         pass
 
-    def output() -> str:
+    def output(self) -> str:
         raise NotImplementedError("Subclasses should implement this method")
 
-    def has_output() -> bool:
+    def has_output(self) -> bool:
         return False
 
 
-class StrProcBase_wip_not_sure:
-    def __init__(self, ):
+class StrProcState(Enum):
+    has_output_default = 0
+    can_input_default = 1
+    can_input_parsing_in_process = 2
+    _group_values = 100
+    has_output = 101
+    can_input = 102
+
+    @staticmethod
+    def get_has_output_set():
+        return {StrProcState.has_output_default.value}
+
+    @staticmethod
+    def get_can_input_set():
+        return {StrProcState.can_input_default.value, StrProcState.can_input_parsing_in_process.value}
+
+    @staticmethod
+    def is_partial_in_group(group, partial):
+        if group == StrProcState.has_output.value:
+            if partial in StrProcState.get_has_output_set():
+                return True
+        if group == StrProcState.can_input.value:
+            if partial in StrProcState.get_can_input_set():
+                return True
+        return False
+
+    def __eq__(self, other):
+        if isinstance(other, StrProcState):
+            if self.value >= self._group_values.value:
+                group = self.value
+                partial = other.value
+            elif other.value >= self._group_values.value:
+                group = other.value
+                partial = self.value
+            else:
+                return super().__eq__(other)
+
+            if partial >= self._group_values.value:
+                return False
+
+            return StrProcState.is_partial_in_group(group, partial)
+        else:
+            return super().__eq__(other)
+
+
+class StrProcBase_ver2:
+
+    def __init__(self):
         super().__init__()
         self.s = None
 
     def input(self, s: str):
         self.s = s
 
-    def eof():
+    def eof(self):
         pass
 
-    def output() -> str:
+    def output(self) -> str:
         s = self.s
         self.s = None
         return s
 
-    def has_output() -> bool:
-        return s is not None
+    def state(self) -> StrProcState:
+        return StrProcState.can_input_default if self.s is None else StrProcState.has_output_default
 
 
 class StrProcLinesUpper(StrProcBase):
@@ -69,7 +116,7 @@ class StrProcReplaceTabs(StrProcBase):
         return s.replace('\t', ' ' * self.spaces_per_tab)
 
 
-class StrBufferBase:
+class StrBufferBase_ver2(StrProcBase_ver2):
     def __init__(self):
         super().__init__()
         self.buffer: List[str] = []
@@ -78,18 +125,19 @@ class StrBufferBase:
         self.buffer.append(s)
         return None
 
-    def eof():
+    def eof(self):
         pass
 
-    def output() -> str:
+    def output(self) -> str:
         return self.buffer.pop(0)
 
-    def has_output() -> bool:
-        return len(self.buffer) > 0
+    def state(self) -> StrProcState:
+        return StrProcState.can_input_default if len(self.buffer) == 0 else StrProcState.has_output_default
 
 
 class StrProcPipeProcess(StrProcBase):
-    def __init__(self, pipe_processes):
+    def __init__(self, pipe_processes: List[StrProcBase]):
+        super().__init__()
         self.pipe_processes = pipe_processes
 
     def input(self, s: str) -> str:
@@ -98,37 +146,56 @@ class StrProcPipeProcess(StrProcBase):
         return s
 
 
-class StrProcPipeProcess_wip_not_sure(StrBufferBase):
-    def __init__(self, pipe_processes: List[StrProcBase]):
+class StrProcPipeProcess_ver2(StrProcBase_ver2):
+    def __init__(self, pipe_processes: List[StrProcBase_ver2]):
+        super().__init__()
         self.pipe_processes = pipe_processes
+        self.buffer = StrBufferBase_ver2()
+        self.pipe_processes.append(self.buffer)
 
-    def str_pipe_process(s: str, start_num = 0):
-        # TODO: WiP. it's a complicated buffering issue. well, not complicated, but it's 2:00 in the morning...
-        #       I will put off this code until tomorrow
+    def str_pipe_process(self):
+        # `-1` - skip last Proc, its a buffer
+        pos = len(self.pipe_processes) - 1
 
-        for i in range(start_num, len(self.pipe_processes)):
-            proc = self.pipe_processes[i]
-            # try get and push some data
-            while proc.has_output():
-                s_tmp = proc.output()
-                super().input(str_pipe_process(s_tmp, i+1))
+        while pos > 0:
+            pos -= 1
+            if pos < 0:
+                break
 
-            # send str to input
-            s_result = proc.input(s)
-            if s_result is None:
+            if self.pipe_processes[pos].state() == StrProcState.has_output:
+                out = self.pipe_processes[pos].output()
+                self.pipe_processes[pos + 1].input(out)
+                pos = len(self.pipe_processes) - 1
                 continue
-            s = s_result
 
-        return s
+    def input(self, s: str):
+        self.pipe_processes[0].input(s)
+        self.str_pipe_process()
 
-    def input(self, s: str) -> str:
-        self.str_pipe_process(s)
-        return None
 
+
+assert StrProcState.can_input_default == StrProcState.can_input
+assert StrProcState.can_input_parsing_in_process == StrProcState.can_input
+assert not (StrProcState.can_input_parsing_in_process == StrProcState.has_output)
+assert StrProcState.has_output_default == StrProcState.has_output
+assert not (StrProcState.has_output_default == StrProcState.can_input_default)
 
 
 # Example usage:
-process1_pipe_obj = StrProcPipeProcess([StrProcRemoveControlChars(), StrProcReplaceTabs(8), StrProcLinesUpper(), StrProcLinesPrint()])
+process1_pipe_obj = StrProcPipeProcess(
+    [StrProcRemoveControlChars(), StrProcReplaceTabs(8), StrProcLinesUpper(), StrProcLinesPrint()])
 
 process1_pipe_obj.input('Hello, world 1!\x01\x02\x03')
 process1_pipe_obj.input('Hello, world 2!\n\r_test_\x01\x02\t\x00\x03_test_!')
+
+# ####
+
+process2_pipe_obj = StrProcPipeProcess_ver2(
+    [StrBufferBase_ver2(), StrBufferBase_ver2(), StrBufferBase_ver2(), StrBufferBase_ver2()])
+
+process2_pipe_obj.input('Hello, world! ver 2')
+
+while process2_pipe_obj.buffer.state() == StrProcState.has_output:
+    print(process2_pipe_obj.buffer.output())
+
+
