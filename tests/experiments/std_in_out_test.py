@@ -2,20 +2,6 @@ from typing import List
 from enum import Enum
 
 
-class StrProcBase:
-    def input(self, s: str) -> (str | None):
-        raise NotImplementedError("Subclasses should implement this method")
-
-    def eof(self):
-        pass
-
-    def output(self) -> str:
-        raise NotImplementedError("Subclasses should implement this method")
-
-    def has_output(self) -> bool:
-        return False
-
-
 class StrProcState(Enum):
     has_output_default = 0
     can_input_default = 1
@@ -61,7 +47,7 @@ class StrProcState(Enum):
             return super().__eq__(other)
 
 
-class StrProcBase_ver2:
+class StrProcBase:
 
     def __init__(self):
         super().__init__()
@@ -83,28 +69,29 @@ class StrProcBase_ver2:
 
 
 class StrProcLinesUpper(StrProcBase):
-    def input(self, s: str) -> str:
-        return s.upper()
+    def input(self, s: str):
+        super().input(s.upper())
 
 
 class StrProcLinesPrint(StrProcBase):
-    def input(self, s: str) -> None:
-        print(s)
+    def input(self, s: str):
+        print(f'print: "{s}"')
+        super().input(s)
 
 
 class StrProcRemoveControlChars(StrProcBase):
     _delete_chars = None
     _trans_table = None
 
-    def __init__(self, ):
+    def __init__(self):
         super().__init__()
         if StrProcRemoveControlChars._delete_chars is None:
             StrProcRemoveControlChars._delete_chars = ''.join([chr(i) for i in range(32) if i not in (9, 10, 13)])
         if StrProcRemoveControlChars._trans_table is None:
             StrProcRemoveControlChars._trans_table = str.maketrans('', '', StrProcRemoveControlChars._delete_chars)
 
-    def input(self, s: str) -> str:
-        return s.translate(self._trans_table)
+    def input(self, s: str):
+        super().input(s.translate(self._trans_table))
 
 
 class StrProcReplaceTabs(StrProcBase):
@@ -112,11 +99,11 @@ class StrProcReplaceTabs(StrProcBase):
         super().__init__()
         self.spaces_per_tab = spaces_per_tab
 
-    def input(self, s: str) -> str:
-        return s.replace('\t', ' ' * self.spaces_per_tab)
+    def input(self, s: str):
+        super().input(s.replace('\t', ' ' * self.spaces_per_tab))
 
 
-class StrBufferBase_ver2(StrProcBase_ver2):
+class StrBufferBase(StrProcBase):
     def __init__(self):
         super().__init__()
         self.buffer: List[str] = []
@@ -139,18 +126,7 @@ class StrProcPipeProcess(StrProcBase):
     def __init__(self, pipe_processes: List[StrProcBase]):
         super().__init__()
         self.pipe_processes = pipe_processes
-
-    def input(self, s: str) -> str:
-        for proc in self.pipe_processes:
-            s = proc.input(s)
-        return s
-
-
-class StrProcPipeProcess_ver2(StrProcBase_ver2):
-    def __init__(self, pipe_processes: List[StrProcBase_ver2]):
-        super().__init__()
-        self.pipe_processes = pipe_processes
-        self.buffer = StrBufferBase_ver2()
+        self.buffer = StrBufferBase()
         self.pipe_processes.append(self.buffer)
 
     def str_pipe_process(self):
@@ -173,6 +149,7 @@ class StrProcPipeProcess_ver2(StrProcBase_ver2):
         self.str_pipe_process()
 
 
+# tests
 
 assert StrProcState.can_input_default == StrProcState.can_input
 assert StrProcState.can_input_parsing_in_process == StrProcState.can_input
@@ -180,22 +157,19 @@ assert not (StrProcState.can_input_parsing_in_process == StrProcState.has_output
 assert StrProcState.has_output_default == StrProcState.has_output
 assert not (StrProcState.has_output_default == StrProcState.can_input_default)
 
-
 # Example usage:
-process1_pipe_obj = StrProcPipeProcess(
-    [StrProcRemoveControlChars(), StrProcReplaceTabs(8), StrProcLinesUpper(), StrProcLinesPrint()])
 
-process1_pipe_obj.input('Hello, world 1!\x01\x02\x03')
-process1_pipe_obj.input('Hello, world 2!\n\r_test_\x01\x02\t\x00\x03_test_!')
 
 # ####
 
-process2_pipe_obj = StrProcPipeProcess_ver2(
-    [StrBufferBase_ver2(), StrBufferBase_ver2(), StrBufferBase_ver2(), StrBufferBase_ver2()])
+process2_pipe_obj = StrProcPipeProcess(
+    [StrProcRemoveControlChars(), StrProcReplaceTabs(8), StrProcLinesUpper(), StrProcLinesPrint(),
+     StrBufferBase(), StrBufferBase(), StrBufferBase(), StrBufferBase()]
+)
 
 process2_pipe_obj.input('Hello, world! ver 2')
+process2_pipe_obj.input('Hello, world 1!\x01\x02\x03')
+process2_pipe_obj.input('Hello, world 2!\n\r_test_\x01\x02\t\x00\x03_test_!')
 
 while process2_pipe_obj.buffer.state() == StrProcState.has_output:
     print(process2_pipe_obj.buffer.output())
-
-
