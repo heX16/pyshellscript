@@ -1,7 +1,69 @@
 import unittest
 from pyshellscript import *
-from datetime import datetime
+from datetime import datetime, date, time
 from typing import Union, List, Optional
+
+
+class TestDatetimeFormatting(unittest.TestCase):
+    """
+    Unit tests for datetime formatting functions.
+    """
+
+    def setUp(self):
+        """
+        Sets up example datetime and date objects for testing.
+        """
+        # Example datetime and date objects for testing
+        self.example_datetime = datetime(2024, 10, 14, 12, 30, 45)
+        self.example_date = date(2024, 10, 14)
+
+    def test_datetime_to_yyyy_mm_dd_hh_mm_ss(self):
+        """
+        Tests the datetime_to_yyyy_mm_dd_hh_mm_ss function with both datetime and date inputs.
+        """
+        # Test with full datetime object
+        formatted = datetime_to_yyyy_mm_dd_hh_mm_ss(self.example_datetime)
+        self.assertEqual(formatted, '2024-10-14 12:30:45')
+
+        # Test with date object (without time)
+        formatted = datetime_to_yyyy_mm_dd_hh_mm_ss(self.example_date)
+        self.assertEqual(formatted, '2024-10-14 00:00:00')
+
+    def test_datetime_to_yyyy_mm_dd_hh_mm(self):
+        """
+        Tests the datetime_to_yyyy_mm_dd_hh_mm function with both datetime and date inputs.
+        """
+        # Test with full datetime object
+        formatted = datetime_to_yyyy_mm_dd_hh_mm(self.example_datetime)
+        self.assertEqual(formatted, '2024-10-14 12:30')
+
+        # Test with date object (without time)
+        formatted = datetime_to_yyyy_mm_dd_hh_mm(self.example_date)
+        self.assertEqual(formatted, '2024-10-14 00:00')
+
+    def test_custom_delimiters(self):
+        """
+        Tests the functions with custom delimiters for both date and time.
+        """
+        # Test with custom delimiters for datetime_to_yyyy_mm_dd_hh_mm_ss
+        formatted = datetime_to_yyyy_mm_dd_hh_mm_ss(self.example_datetime, delimiter_date='/', delimiter_time='.')
+        self.assertEqual(formatted, '2024/10/14 12.30.45')
+
+        # Test with custom delimiters for datetime_to_yyyy_mm_dd_hh_mm
+        formatted = datetime_to_yyyy_mm_dd_hh_mm(self.example_datetime, delimiter_date='.', delimiter_time='-')
+        self.assertEqual(formatted, '2024.10.14 12-30')
+
+    def test_single_delimiter(self):
+        """
+        Tests the functions with a single delimiter for both date and time.
+        """
+        # Test with single delimiter for datetime_to_yyyy_mm_dd_hh_mm_ss
+        formatted = datetime_to_yyyy_mm_dd_hh_mm_ss(self.example_datetime, delimiter='.')
+        self.assertEqual(formatted, '2024.10.14 12.30.45')
+
+        # Test with single delimiter for datetime_to_yyyy_mm_dd_hh_mm
+        formatted = datetime_to_yyyy_mm_dd_hh_mm(self.example_datetime, delimiter='/')
+        self.assertEqual(formatted, '2024/10/14 12/30')
 
 
 class TestDatetimeParse(unittest.TestCase):

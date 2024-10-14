@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyshellscript"
-version = "0.3.0"
+version = "0.3.1"
 requires-python = ">=3.3"
 description = "Library for shell scripting in Python"
 authors = [{name = "heX", email = "hex1625616@gmail.com"}]
