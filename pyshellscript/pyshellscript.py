@@ -1,6 +1,5 @@
 # coding: utf-8
 # about: Library for shell scripting in Python
-# ver: 2024-03-24
 # author: heX
 # url: https://github.com/heX16
 
@@ -28,7 +27,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.2.8'
+    return '0.3.0'
 
 
 # Global variable ################################################################
