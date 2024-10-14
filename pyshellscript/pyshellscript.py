@@ -1851,7 +1851,7 @@ def datetime_to_yyyy_mm_dd_hh_mm_ss(
         d_t = delimiter_time
         d_d = delimiter_date
         d_dt = delimiter_date_time
-        return time_value.strftime(f'%Y{d_d}%m{d_d}%d %H{d_t}%M{d_t}%S')
+        return time_value.strftime(f'%Y{d_d}%m{d_d}%d{d_dt}%H{d_t}%M{d_t}%S')
     else:
         raise TypeError('Invalid type: expected datetime or date.')
 
@@ -1868,7 +1868,7 @@ def datetime_to_yyyy_mm_dd_hh_mm(
         d_t = delimiter_time
         d_d = delimiter_date
         d_dt = delimiter_date_time
-        return time_value.strftime(f'%Y{d_d}%m{d_d}%d %H{d_t}%M')
+        return time_value.strftime(f'%Y{d_d}%m{d_d}%d{d_dt}%H{d_t}%M')
     else:
         raise TypeError('Invalid type: expected datetime or date.')
 
