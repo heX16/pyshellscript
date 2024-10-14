@@ -431,7 +431,7 @@ def copy_file(source_file: Path | str, destination_dir: Path | str):
 
     # Copy the file to the destination directory
     shutil.copy2(source_path, destination_path)
-    set_create_time(destination_path, get_create_time(source_path))
+    set_file_create_time(destination_path, get_file_create_time(source_path))
     # log(f'File {source_path} copied to {destination_path}')
 
 
@@ -575,7 +575,7 @@ def copy_file_with_progress(source_path: Path | str, destination_path: Path | st
                     raise
 
         shutil.copystat(source_path, destination_path, follow_symlinks=follow_symlinks)
-        set_create_time(destination_path, get_create_time(source_path))
+        set_file_create_time(destination_path, get_file_create_time(source_path))
 
 
 def format_bytes(byte_count, kibi=False):
@@ -1804,74 +1804,74 @@ def datetime_trim_time(t: datetime) -> datetime:
 
 
 def datetime_to_yyyy_mm_dd_hh_mm_ss(
-        time: Union[datetime, date],
+        time_value: Union[datetime, date],
         delimiter_date: str = '-',
         delimiter_time: str = ':',
         delimiter_date_time: str = ' ') -> str:
     """
     Convert time to 'YYYY-MM-DD HH:MM:SS' format.
     """
-    if isinstance(time, (datetime, date)):
+    if isinstance(time_value, (datetime, date)):
         d_t = delimiter_time
         d_d = delimiter_date
         d_dt = delimiter_date_time
-        return time.strftime(f'%Y{d_d}%m{d_d}%d %H{d_t}%M{d_t}%S')
+        return time_value.strftime(f'%Y{d_d}%m{d_d}%d %H{d_t}%M{d_t}%S')
     else:
         raise TypeError('Invalid type: expected datetime or date.')
 
 
 def datetime_to_yyyy_mm_dd_hh_mm(
-        time: Union[datetime, date],
+        time_value: Union[datetime, date],
         delimiter_date: str = '-',
         delimiter_time: str = ':',
         delimiter_date_time: str = ' ') -> str:
     """
     Convert time to 'YYYY-MM-DD HH:MM' format.
     """
-    if isinstance(time, (datetime, date)):
+    if isinstance(time_value, (datetime, date)):
         d_t = delimiter_time
         d_d = delimiter_date
         d_dt = delimiter_date_time
-        return time.strftime(f'%Y{d_d}%m{d_d}%d %H{d_t}%M')
+        return time_value.strftime(f'%Y{d_d}%m{d_d}%d %H{d_t}%M')
     else:
         raise TypeError('Invalid type: expected datetime or date.')
 
 
-def datetime_to_yyyy_mm_dd(time: Union[datetime, date], delimiter: str = '-') -> str:
+def datetime_to_yyyy_mm_dd(time_value: Union[datetime, date], delimiter: str = '-') -> str:
     """
     Convert time to 'YYYY-MM-DD' format.
     Example:
         > datetime_to_yyyy_mm_dd(now())
         > '2024-12-16'
     """
-    if isinstance(time, (datetime, date)):
-        return time.strftime(f'%Y{delimiter}%m{delimiter}%d')
+    if isinstance(time_value, (datetime, date)):
+        return time_value.strftime(f'%Y{delimiter}%m{delimiter}%d')
     else:
         raise TypeError('Invalid type: expected datetime or date.')
 
 
-def datetime_to_hh_mm_ss(time: Union[datetime, time], delimiter: str = '-') -> str:
+def datetime_to_hh_mm_ss(time_value: Union[datetime, time], delimiter: str = '-') -> str:
     """
     Convert time to 'HH-MM-SS' format.
     Example:
         > datetime_to_hh_mm_ss(datetime.now(), delimiter=':')
         > '08:16:32'
     """
-    if isinstance(time, (datetime, time)):
-        return time.strftime(f'%H{delimiter}%M{delimiter}%S')
+    if isinstance(time_value, (datetime, time)):
+        return time_value.strftime(f'%H{delimiter}%M{delimiter}%S')
     else:
         raise TypeError('Invalid type: expected datetime or time.')
 
 
-def datetime_to_hh_mm(time: Union[datetime, time], delimiter: str = '-') -> str:
+def datetime_to_hh_mm(time_value: Union[datetime, time], delimiter: str = '-') -> str:
     """
     Convert time to 'HH-MM' format.
     Example:
         > datetime_to_hh_mm(datetime.now(), delimiter=':')
         > '08:16'
     """
-    if isinstance(time, (datetime, time)):
-        return time.strftime(f'%H{delimiter}%M')
+    if isinstance(time_value, (datetime, time)):
+        return time_value.strftime(f'%H{delimiter}%M')
     else:
         raise TypeError('Invalid type: expected datetime or time.')
 
@@ -1904,118 +1904,92 @@ def _regex_build_delimiter_pattern(delimiters: Union[str, List[str]], group_name
 
 
 def datetime_parse(
-    s: str,
-    raise_exception: bool = False,
-    delimiter_date: Union[str, List[str]] = ['-', '/'],
-    delimiter_time: Union[str, List[str]] = ['-', ':'],
-    delimiter_date_time: Union[str, List[str]] = [' ', '_', '-', 'T'],
-    require_start: Union[str, bool] = False,
-    require_end: Union[str, bool] = False,
-    iso: bool = False,
-    iso_basic: bool = False,
-    no_time: bool = False,
-) -> Optional[datetime]:
+        s: str,
+        raise_exception: bool = False,
+        delimiter_date: Union[str, List[str]] = None,
+        delimiter_time: Union[str, List[str]] = None,
+        delimiter_date_time: Union[str, List[str]] = None,
+        require_start: Union[str, bool] = False,
+        require_end: Union[str, bool] = False,
+        iso: bool = False,
+        iso_basic: bool = False,
+        no_time: bool = False,
+) -> Union[datetime, None]:
     """
     Parses a string containing a date and time in various formats into a `datetime` object.
 
-    Parameters
-    ----------
-    s : str
+    :param s:
         The string to parse.
-    raise_exception : bool, optional
-        If `True`, raises an exception on parsing errors.
-        If `False`, returns `None` on failure.
-        Default is `False`.
-    delimiter_date : Union[str, List[str]], optional
-        Delimiters used between date components (year, month, day).
-        Can be a single string or a list of strings.
-        Default is `['-', '/']`.
-    delimiter_time : Union[str, List[str]], optional
-        Delimiters used between time components (hour, minute, second).
-        Can be a single string or a list of strings.
-        Default is `['-', ':']`.
-    delimiter_date_time : Union[str, List[str]], optional
-        Delimiters used between the date and time parts.
-        Can be a single string or a list of strings.
-        Default is `[' ', '_', '-', 'T']`.
-    require_start : Union[str, bool], optional
-        If `True`, the date must be at the start of the string (adds `^` in regex).
-        If `False`, no requirement.
-        If a string, it is used as the starting pattern in regex.
-        Default is `False`.
-    require_end : Union[str, bool], optional
-        If `True`, the date must be at the end of the string (adds `$` in regex).
-        If `False`, no requirement.
-        If a string, it is used as the ending pattern in regex.
-        Default is `False`.
-    iso : bool, optional
-        If `True`, only matches ISO 8601 format (`YYYY-MM-DD HH:MM[:SS]`).
-        Default is `False`.
-    iso_basic : bool, optional
-        If `True`, only matches basic ISO 8601 format without delimiters (`YYYYMMDDHHMMSS`).
-        Default is `False`.
+    :param raise_exception:
+        If `True`, raises an exception on parsing errors. If `False`, returns `None` on failure. Default is `False`.
+    :param delimiter_date:
+        Delimiters used between date components (year, month, day). Can be a single string or a list of strings. Default is `['-', '/']`.
+    :param delimiter_time:
+        Delimiters used between time components (hour, minute, second). Can be a single string or a list of strings. Default is `['-', ':']`.
+    :param delimiter_date_time:
+        Delimiters used between the date and time parts. Can be a single string or a list of strings. Default is `[' ', '_', '-', 'T']`.
+    :param require_start:
+        If `True`, the date must be at the start of the string (adds `^` in regex). If `False`, no requirement. If a string, it is used as the starting pattern in regex. Default is `False`.
+    :param require_end:
+        If `True`, the date must be at the end of the string (adds `$` in regex). If `False`, no requirement. If a string, it is used as the ending pattern in regex. Default is `False`.
+    :param iso:
+        If `True`, only matches ISO 8601 format (`YYYY-MM-DD HH:MM[:SS]`). Default is `False`.
+    :param iso_basic:
+        If `True`, only matches basic ISO 8601 format without delimiters (`YYYYMMDDHHMMSS`). Default is `False`.
+    :param no_time:
+        If `True`, only matches date parts (no time required). Default is `False`.
 
-    Returns
-    -------
-    Optional[datetime]
+    :return:
         A `datetime` object if parsing is successful, otherwise `None`.
 
-    Raises
-    ------
-    ValueError
-        If the string does not match any expected format or contains invalid date/time,
-        and `raise_exception` is `True`.
-    TypeError
+    :raises ValueError:
+        If the string does not match any expected format or contains invalid date/time, and `raise_exception` is `True`.
+    :raises TypeError:
         If any of the delimiter parameters are neither strings nor lists of strings.
 
-    Notes
-    -----
-    - The function attempts to parse the input string using multiple date and time formats.
-      It returns the first successfully parsed `datetime` object.
-    - If `iso` is set to `True`, only the standard ISO 8601 format (`YYYY-MM-DD HH:MM[:SS]`)
-      is considered during parsing.
-    - If `iso_basic` is set to `True`, only the basic ISO 8601 format without delimiters
-      (`YYYYMMDDHHMMSS`) is considered.
-    - If `require_start` or `require_end` are strings, they are directly used in the regex
-      patterns to enforce custom start or end conditions.
-    - Two-digit years are assumed to be in the 2000s. For example, `'21'` becomes `2021`.
-    - Delimiters can be customized to match various date and time formats.
+    .. note::
+        The function attempts to parse the input string using multiple date and time formats.
+        It returns the first successfully parsed `datetime` object.
 
-    Examples
-    --------
-    Basic usage:
+        If `iso` is set to `True`, only the standard ISO 8601 format (`YYYY-MM-DD HH:MM[:SS]`) is considered during parsing.
+
+        If `iso_basic` is set to `True`, only the basic ISO 8601 format without delimiters (`YYYYMMDDHHMMSS`) is considered.
+
+        If `require_start` or `require_end` are strings, they are directly used in the regex patterns to enforce custom start or end conditions.
+
+        Two-digit years are assumed to be in the 2000s. For example, `'21'` becomes `2021`.
+
+        Delimiters can be customized to match various date and time formats.
+
+    **Examples**:
 
     >>> datetime_parse("2022-12-31 23:59:59")
     datetime.datetime(2022, 12, 31, 23, 59, 59)
 
-    Using custom delimiters:
-
     >>> datetime_parse("2022/12/31_23-59", delimiter_date='/', delimiter_time='-')
     datetime.datetime(2022, 12, 31, 23, 59)
-
-    Enforcing start and end of string:
-
-    >>> datetime_parse("Log at 2022-12-31 23:59", require_start=True)
-    None
 
     >>> datetime_parse("2022-12-31 23:59 Log", require_end=True)
     None
 
-    Parsing ISO 8601 basic format:
-
     >>> datetime_parse("20221231T235959", delimiter_date_time='T', iso_basic=True)
     datetime.datetime(2022, 12, 31, 23, 59, 59)
 
-    Handling parsing errors:
+    >>> datetime_parse("2022-12-31", no_time=True)
+    datetime.datetime(2022, 12, 31, 0, 0)
 
     >>> datetime_parse("Invalid date", raise_exception=False)
     None
-
-    >>> datetime_parse("Invalid date", raise_exception=True)
-    Traceback (most recent call last):
-        ...
-    ValueError: No matching datetime format found.
     """
+
+    # Default values
+    if delimiter_date is None:
+        delimiter_date = ['-', '/']
+    if delimiter_time is None:
+        delimiter_time = ['-', ':']
+    if delimiter_date_time is None:
+        delimiter_date_time = [' ', '_', '-', 'T']
+
     # Define common regex patterns
     yyyy = r'(?P<year>\d{4})'
     yy = r'(?P<year>\d{2})'
@@ -2031,21 +2005,17 @@ def datetime_parse(
     d_dt = _regex_build_delimiter_pattern(delimiter_date_time, 'd_dt')
 
     # Optionally enforce start and end of string
-    if require_start == True:
-        start_pattern = '^'
-    elif require_start == False:
-        start_pattern = ''
-    elif isinstance(require_start, str):
+    if isinstance(require_start, str):
         start_pattern = require_start
+    elif isinstance(require_start, bool):
+        start_pattern = '^' if require_start else ''
     else:
         raise TypeError('require_start must be a string or bool.')
 
-    if require_end == True:
-        end_pattern = '$'
-    elif require_end == False:
-        end_pattern = ''
-    elif isinstance(require_end, str):
+    if isinstance(require_end, str):
         end_pattern = require_end
+    elif isinstance(require_end, bool):
+        end_pattern = '$' if require_end else ''
     else:
         raise TypeError('require_end must be a string or bool.')
 
