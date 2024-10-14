@@ -300,6 +300,7 @@ def rmdir(path: str | Path, must_be_empty: bool = False, recursive: bool = True)
     :raises IsADirectoryError: If the path is not a directory.
     :raises OSError: If must_be_empty is True and the directory is not empty.
     """
+
     def rmdir_recursion(path_recur: Path):
         # Delete files in this directory (recursively)
         for item in path_recur.iterdir():
@@ -1838,38 +1839,58 @@ def datetime_trim_time(t: datetime) -> datetime:
         raise TypeError("Unsupported type for t. Expected datetime.")
 
 
-def datetime_to_yyyy_mm_dd_hh_mm_ss(
+def _datetime_format(
+        strftime: str,
         time_value: Union[datetime, date],
         delimiter_date: str = '-',
         delimiter_time: str = ':',
-        delimiter_date_time: str = ' ') -> str:
-    """
-    Convert time to 'YYYY-MM-DD HH:MM:SS' format.
-    """
+        delimiter_date_time: str = ' ',
+        delimiter: Union[str, None] = None
+) -> str:
     if isinstance(time_value, (datetime, date)):
         d_t = delimiter_time
         d_d = delimiter_date
         d_dt = delimiter_date_time
-        return time_value.strftime(f'%Y{d_d}%m{d_d}%d{d_dt}%H{d_t}%M{d_t}%S')
+        if delimiter is not None:
+            d_t = delimiter
+            d_d = delimiter
+        # Convert delimiter variables to text
+        strftime = strftime.format(d_d=d_d, d_t=d_t, d_dt=d_dt)
+        return time_value.strftime(strftime)
     else:
         raise TypeError('Invalid type: expected datetime or date.')
+
+
+def datetime_to_yyyy_mm_dd_hh_mm_ss(
+        time_value: Union[datetime, date],
+        delimiter_date: str = '-',
+        delimiter_time: str = ':',
+        delimiter_date_time: str = ' ',
+        delimiter: Union[str, None] = None
+) -> str:
+    """
+    Convert time to 'YYYY-MM-DD HH:MM:SS' format.
+    """
+    return _datetime_format(
+        strftime='%Y{d_d}%m{d_d}%d{d_dt}%H{d_t}%M{d_t}%S',
+        **locals()
+    )
 
 
 def datetime_to_yyyy_mm_dd_hh_mm(
         time_value: Union[datetime, date],
         delimiter_date: str = '-',
         delimiter_time: str = ':',
-        delimiter_date_time: str = ' ') -> str:
+        delimiter_date_time: str = ' ',
+        delimiter: Union[str, None] = None
+) -> str:
     """
     Convert time to 'YYYY-MM-DD HH:MM' format.
     """
-    if isinstance(time_value, (datetime, date)):
-        d_t = delimiter_time
-        d_d = delimiter_date
-        d_dt = delimiter_date_time
-        return time_value.strftime(f'%Y{d_d}%m{d_d}%d{d_dt}%H{d_t}%M')
-    else:
-        raise TypeError('Invalid type: expected datetime or date.')
+    return _datetime_format(
+        strftime='%Y{d_d}%m{d_d}%d{d_dt}%H{d_t}%M',
+        **locals()
+    )
 
 
 def datetime_to_yyyy_mm_dd(time_value: Union[datetime, date], delimiter: str = '-') -> str:
