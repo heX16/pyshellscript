@@ -301,13 +301,27 @@ def rmdir(path: str | Path, must_be_empty: bool = False, recursive: bool = True)
     :raises IsADirectoryError: If the path is not a directory.
     :raises OSError: If must_be_empty is True and the directory is not empty.
     """
+    def rmdir_recursion(path_recur: Path):
+        # Delete files in this directory (recursively)
+        for item in path_recur.iterdir():
+            if item.is_dir():
+                # Recursively remove subdirectories
+                rmdir_recursion(item)  # >> RECURSION
+
+                # NOTE: I know about: `shutil.rmtree(item)`.
+                #       But I want more control here, it might come in handy in the future.
+            else:
+                item.unlink()  # Remove files
+        path_recur.rmdir()  # Finally remove the directory itself
+
+    # Main function:
 
     path = Path(path)
 
     if not recursive and not must_be_empty:
-        raise ValueError('When `recursion=False`, then should be `must_be_empty=True`')
+        raise ValueError('When `recursion=False`, then must be: `must_be_empty=True`')
     elif recursive and must_be_empty:
-        raise ValueError('When `recursion=True`, then should be `must_be_empty=False`')
+        raise ValueError('When `recursion=True`, then must be: `must_be_empty=False`')
     elif not path.is_dir():
         raise IsADirectoryError(f'Cannot remove {path} because it is not a directory.')
 
@@ -318,17 +332,7 @@ def rmdir(path: str | Path, must_be_empty: bool = False, recursive: bool = True)
             raise OSError(f'Cannot remove {path} because it is not empty.')
 
     if recursive:
-        # Delete files in this directory (recursively)
-        for item in path.iterdir():
-            if item.is_dir():
-                # Recursively remove subdirectories
-                rmdir(item, must_be_empty=False, recursive=True)  # >> RECURSION
-
-                # NOTE: I know about: `shutil.rmtree(item)`.
-                #       But I want more control here, it might come in handy in the future.
-            else:
-                item.unlink()  # Remove files
-        path.rmdir()  # Finally remove the directory itself
+        rmdir_recursion(path)
     else:
         path.rmdir()  # Non-recursive removal, only works if the directory is empty
 
