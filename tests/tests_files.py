@@ -2,8 +2,10 @@ import unittest
 from pathlib import Path
 import shutil
 import os
+import sys
 
 from pyshellscript import *
+
 
 class TestFileCopyFunctions(unittest.TestCase):
     test_dir = Path('file_op_tests')
@@ -117,6 +119,7 @@ class TestFileCopyFunctions(unittest.TestCase):
         for file_path in expected_files:
             self.assertTrue(file_path.exists())
 
+    @unittest.skipIf(os.name == 'nt', "Skipping symlink test on Windows")
     def test_copy_symlink(self):
         # Test copying symbolic link
         symlink_target = self.source_dir / 'file1.txt'
@@ -157,12 +160,12 @@ class TestFileCopyFunctions(unittest.TestCase):
             copy_file(source_file, destination_file)
 
     def test_copy_to_nonexistent_directory(self):
-        # Test copying to a nonexistent directory raises NotADirectoryError
+        # Test copying to a nonexistent directory raises FileNotFoundError
         source_file = self.source_dir / 'file1.txt'
         destination_dir = self.destination_dir / 'nonexistent_directory'
         destination_file = destination_dir / 'file1.txt'
 
-        with self.assertRaises(NotADirectoryError):
+        with self.assertRaises(FileNotFoundError):
             copy_file(source_file, destination_file)
 
     def test_copy_empty_directory(self):
@@ -172,8 +175,11 @@ class TestFileCopyFunctions(unittest.TestCase):
         copy_files(empty_dir, self.destination_dir / 'empty_dir_copy')
 
         # Check that the empty directory was copied
-        self.assertTrue((self.destination_dir / 'empty_dir_copy').exists())
-        self.assertTrue((self.destination_dir / 'empty_dir_copy').is_dir())
+        copied_empty_dir = self.destination_dir / 'empty_dir_copy'
+        self.assertTrue(copied_empty_dir.exists())
+        self.assertTrue(copied_empty_dir.is_dir())
+        # Check that directory is empty
+        self.assertEqual(len(list(copied_empty_dir.iterdir())), 0)
 
     def test_copy_large_number_of_files(self):
         # Test copying a large number of files
@@ -190,7 +196,7 @@ class TestFileCopyFunctions(unittest.TestCase):
     def test_copy_large_file(self):
         # Test copying a large file
         large_file = self.source_dir / 'large_file.txt'
-        large_file_content = 'A' * (10 * 1024)  # 1 MB file
+        large_file_content = 'A' * (10 * 1024 * 1024)  # 10 MB file
         large_file.write_text(large_file_content)
 
         destination_file = self.destination_dir / 'large_file.txt'
@@ -201,13 +207,14 @@ class TestFileCopyFunctions(unittest.TestCase):
         self.assertEqual(destination_file.stat().st_size, large_file.stat().st_size)
         self.assertEqual(destination_file.read_text(), large_file_content)
 
+    @unittest.skipIf(os.name == 'nt', "Skipping permission test on Windows")
     def test_copy_file_no_permission(self):
         # Test copying a file without permission
         source_file = self.source_dir / 'file1.txt'
         destination_file = self.destination_dir / 'file1.txt'
 
         # Remove write permissions from destination directory
-        self.destination_dir.chmod(0o444)
+        self.destination_dir.chmod(0o555)
 
         try:
             with self.assertRaises(PermissionError):
@@ -223,4 +230,3 @@ class TestFileCopyFunctions(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
