@@ -67,6 +67,13 @@ class StrProcBase:
     def state(self) -> StrProcState:
         return StrProcState.can_input_default if self.s is None else StrProcState.has_output_default
 
+    def __bool__(self):
+        return self.state() == StrProcState.has_output
+
+    def __iter__(self):
+        while self:
+            yield self.output()
+
 
 class StrProcLinesUpper(StrProcBase):
     def input(self, s: str):
@@ -121,6 +128,9 @@ class StrBufferBase(StrProcBase):
     def state(self) -> StrProcState:
         return StrProcState.can_input_default if len(self.buffer) == 0 else StrProcState.has_output_default
 
+    def __bool__(self):
+        return len(self.buffer) > 0
+
 
 class StrProcPipeProcess(StrProcBase):
     def __init__(self, pipe_processes: List[StrProcBase]):
@@ -151,6 +161,12 @@ class StrProcPipeProcess(StrProcBase):
         self.pipe_processes[0].input(s)
         self.str_pipe_process()
 
+    def __bool__(self):
+        return bool(self.buffer)
+
+    def __iter__(self):
+        return iter(self.buffer)
+
 
 # tests
 
@@ -179,6 +195,5 @@ input_data = [
 
 while len(input_data) > 0:
     process2_pipe_obj.input(input_data.pop(0))
-    while process2_pipe_obj.buffer.state() == StrProcState.has_output:
-        print('output():', process2_pipe_obj.buffer.output())
-
+    for s in process2_pipe_obj:
+        print('output():', s)
