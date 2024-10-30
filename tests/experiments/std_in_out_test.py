@@ -4,71 +4,38 @@ from enum import Enum
 
 class StrProcState(Enum):
     has_output_default = 0
-    can_input_default = 1
-    can_input_parsing_in_process = 2
-    _group_values = 100
-    has_output = 101
-    can_input = 102
+    can_input_default = 100
+    can_input_parsing_in_process = 101
 
-    @staticmethod
-    def get_has_output_set():
-        return {StrProcState.has_output_default.value}
+    def has_output(self):
+        return self.value < StrProcState.can_input_default.value
 
-    @staticmethod
-    def get_can_input_set():
-        return {StrProcState.can_input_default.value, StrProcState.can_input_parsing_in_process.value}
-
-    @staticmethod
-    def is_partial_in_group(group, partial):
-        if group == StrProcState.has_output.value:
-            if partial in StrProcState.get_has_output_set():
-                return True
-        if group == StrProcState.can_input.value:
-            if partial in StrProcState.get_can_input_set():
-                return True
-        return False
-
-    def __eq__(self, other):
-        if isinstance(other, StrProcState):
-            if self.value >= self._group_values.value:
-                group = self.value
-                partial = other.value
-            elif other.value >= self._group_values.value:
-                group = other.value
-                partial = self.value
-            else:
-                return super().__eq__(other)
-
-            if partial >= self._group_values.value:
-                return False
-
-            return StrProcState.is_partial_in_group(group, partial)
-        else:
-            return super().__eq__(other)
+    def can_input(self):
+        return self.value >= StrProcState.can_input_default.value
 
 
 class StrProcBase:
 
     def __init__(self):
         super().__init__()
-        self.s = None
+        self.buffer_str = None
 
     def input(self, s: str):
-        self.s = s
+        self.buffer_str = s
 
     def eof(self):
         pass
 
     def output(self) -> str:
-        s = self.s
-        self.s = None
+        s = self.buffer_str
+        self.buffer_str = None
         return s
 
     def state(self) -> StrProcState:
-        return StrProcState.can_input_default if self.s is None else StrProcState.has_output_default
+        return StrProcState.can_input_default if self.buffer_str is None else StrProcState.has_output_default
 
     def __bool__(self):
-        return self.state() == StrProcState.has_output
+        return self.state().has_output()
 
     def __iter__(self):
         while self:
@@ -148,7 +115,7 @@ class StrProcPipeProcess(StrProcBase):
             if pos < 0:
                 break
 
-            if self.pipe_processes[pos].state() == StrProcState.has_output:
+            if self.pipe_processes[pos].state().has_output():
                 # get text from the current processor
                 out = self.pipe_processes[pos].output()
                 # send text to the next processor
@@ -170,10 +137,10 @@ class StrProcPipeProcess(StrProcBase):
 
 # tests
 
-assert StrProcState.can_input_default == StrProcState.can_input
-assert StrProcState.can_input_parsing_in_process == StrProcState.can_input
-assert not (StrProcState.can_input_parsing_in_process == StrProcState.has_output)
-assert StrProcState.has_output_default == StrProcState.has_output
+assert StrProcState.can_input_default.can_input()
+assert StrProcState.can_input_parsing_in_process.can_input()
+assert not (StrProcState.can_input_parsing_in_process.has_output())
+assert StrProcState.has_output_default.has_output()
 assert not (StrProcState.has_output_default == StrProcState.can_input_default)
 
 # Example usage:
@@ -195,5 +162,5 @@ input_data = [
 
 while len(input_data) > 0:
     process2_pipe_obj.input(input_data.pop(0))
-    for s in process2_pipe_obj:
-        print('output():', s)
+    for s_tmp in process2_pipe_obj:
+        print('output():', s_tmp)
