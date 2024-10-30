@@ -139,8 +139,11 @@ class StrProcPipeProcess(StrProcBase):
                 break
 
             if self.pipe_processes[pos].state() == StrProcState.has_output:
+                # get text from the current processor
                 out = self.pipe_processes[pos].output()
+                # send text to the next processor
                 self.pipe_processes[pos + 1].input(out)
+                # reset cycle
                 pos = len(self.pipe_processes) - 1
                 continue
 
@@ -167,9 +170,15 @@ process2_pipe_obj = StrProcPipeProcess(
      StrBufferBase(), StrBufferBase(), StrBufferBase(), StrBufferBase()]
 )
 
-process2_pipe_obj.input('Hello, world! ver 2')
-process2_pipe_obj.input('Hello, world 1!\x01\x02\x03')
-process2_pipe_obj.input('Hello, world 2!\n\r_test_\x01\x02\t\x00\x03_test_!')
+input_data = [
+    'Hello, world! ver 2',
+    'Hello, world 1!\x01\x02\x03',
+    'Hello, world 2!\n\r_test_\x01\x02\t\x00\x03_test_!',
+]
 
-while process2_pipe_obj.buffer.state() == StrProcState.has_output:
-    print(process2_pipe_obj.buffer.output())
+
+while len(input_data) > 0:
+    process2_pipe_obj.input(input_data.pop(0))
+    while process2_pipe_obj.buffer.state() == StrProcState.has_output:
+        print('output():', process2_pipe_obj.buffer.output())
+
