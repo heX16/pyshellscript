@@ -1,5 +1,5 @@
-from typing import List
-from enum import Enum
+from typing import List, Set
+from enum import Enum, IntEnum
 
 
 class StrProcState(Enum):
@@ -14,6 +14,15 @@ class StrProcState(Enum):
         return self.value >= StrProcState.can_input_default.value
 
 
+class StrProcFlags(IntEnum):
+    is_transit_1_by_1 = 1
+    is_infinity_input = 2
+    is_infinity_output = 3
+    input_buffer_has_memory_limit = 4
+    no_output = 5
+    has_sub_proc = 6
+
+
 class StrProcBase:
 
     def __init__(self):
@@ -21,18 +30,26 @@ class StrProcBase:
         self.buffer_str: str | None = None
 
     def input(self, s: str):
+        if self.buffer_str is not None:
+            raise BrokenPipeError()
         self.buffer_str = s
 
     def eof(self):
         pass
 
     def output(self) -> str:
+        if self.buffer_str is None:
+            raise BrokenPipeError()
         s = self.buffer_str
         self.buffer_str = None
         return s
 
     def state(self) -> StrProcState:
         return StrProcState.can_input_default if self.buffer_str is None else StrProcState.has_output_default
+
+    @staticmethod
+    def class_flags() -> Set[StrProcFlags]:
+        return {StrProcFlags.is_transit_1_by_1}
 
     def __bool__(self):
         return self.state().has_output()
@@ -42,15 +59,19 @@ class StrProcBase:
             yield self.output()
 
 
-class StrProcLinesUpper(StrProcBase):
+class StrProcUpper(StrProcBase):
     def input(self, s: str):
         super().input(s.upper())
 
 
-class StrProcLinesPrint(StrProcBase):
+class StrProcPrint(StrProcBase):
     def input(self, s: str):
         print(f'print: "{s}"')
         super().input(s)
+
+class StrProcPrintFinal(StrProcBase):
+    def input(self, s: str):
+        print(f'print: "{s}"')
 
 
 class StrProcRemoveControlChars(StrProcBase):
@@ -98,6 +119,10 @@ class StrBufferBase(StrProcBase):
     def __bool__(self):
         return len(self.buffer) > 0
 
+    @staticmethod
+    def class_flags() -> Set[StrProcFlags]:
+        return {StrProcFlags.is_infinity_input, StrProcFlags.input_buffer_has_memory_limit}
+
 
 class StrProcPipeProcess(StrProcBase):
     def __init__(self, pipe_processes: List[StrProcBase]):
@@ -129,6 +154,11 @@ class StrProcPipeProcess(StrProcBase):
     def output(self) -> str:
         return self.pipe_processes[-1].output()
 
+    def eof(self):
+        for p in self.pipe_processes:
+            p.eof()
+        self.str_pipe_process()
+
     def __bool__(self):
         return bool(self.pipe_processes[-1])
 
@@ -142,7 +172,7 @@ class StrProcPipeProcess(StrProcBase):
 # ####
 
 process2_pipe_obj = StrProcPipeProcess(
-    [StrProcRemoveControlChars(), StrProcReplaceTabs(8), StrProcLinesUpper(), StrProcLinesPrint(),
+    [StrProcRemoveControlChars(), StrProcReplaceTabs(8), StrProcUpper(), StrProcPrint(),
      StrBufferBase(), StrBufferBase(), StrBufferBase(), StrBufferBase()]
 )
 
