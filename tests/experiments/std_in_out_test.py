@@ -4,6 +4,7 @@ from enum import Enum, IntEnum
 
 class StrProcState(Enum):
     has_output_default = 0
+    has_output_and_can_input = 1
     can_input_default = 100
     can_input_and_parsing_in_process = 101
 
@@ -31,7 +32,8 @@ class StrProcBase:
 
     def input(self, s: str):
         if self.buffer_str is not None:
-            raise BrokenPipeError()
+            raise BrokenPipeError(
+                'Cannot accept new input: buffer is already full. Please process the existing data first.')
         self.buffer_str = s
 
     def eof(self):
@@ -39,7 +41,8 @@ class StrProcBase:
 
     def output(self) -> str:
         if self.buffer_str is None:
-            raise BrokenPipeError()
+            raise BrokenPipeError(
+                'Cannot provide output: buffer is empty. Ensure data is provided before attempting to read.')
         s = self.buffer_str
         self.buffer_str = None
         return s
@@ -69,9 +72,9 @@ class StrProcPrint(StrProcBase):
         print(f'print: "{s}"')
         super().input(s)
 
-class StrProcPrintFinal(StrProcBase):
-    def input(self, s: str):
-        print(f'print: "{s}"')
+    @staticmethod
+    def class_flags() -> Set[StrProcFlags]:
+        return {StrProcFlags.no_output}
 
 
 class StrProcRemoveControlChars(StrProcBase):
@@ -128,6 +131,8 @@ class StrProcPipeProcess(StrProcBase):
     def __init__(self, pipe_processes: List[StrProcBase]):
         super().__init__()
         self.pipe_processes = pipe_processes
+        if StrProcFlags.is_infinity_input not in self.pipe_processes[-1].class_flags():
+            self.pipe_processes.append(StrBufferBase())
 
     def str_pipe_process(self):
         # `-1` - skip last `StrProc`
@@ -165,6 +170,21 @@ class StrProcPipeProcess(StrProcBase):
     def __iter__(self):
         return iter(self.pipe_processes[-1])
 
+    def state(self) -> StrProcState:
+        if self.pipe_processes[-1].state().has_output():
+            if self.pipe_processes[0].state().can_input():
+                return StrProcState.has_output_and_can_input
+            else:
+                return StrProcState.has_output_default
+        elif self.pipe_processes[0].state().can_input():
+            return StrProcState.can_input_default
+        else:
+            raise BrokenPipeError('Pipeline is in an invalid state: unable to accept input')
+
+    @staticmethod
+    def class_flags() -> Set[StrProcFlags]:
+        return {StrProcFlags.has_sub_proc}
+
 
 # Example usage:
 
@@ -173,7 +193,7 @@ class StrProcPipeProcess(StrProcBase):
 
 process2_pipe_obj = StrProcPipeProcess(
     [StrProcRemoveControlChars(), StrProcReplaceTabs(8), StrProcUpper(), StrProcPrint(),
-     StrBufferBase(), StrBufferBase(), StrBufferBase(), StrBufferBase()]
+     StrBufferBase(), StrBufferBase(), StrBufferBase(), StrBufferBase(), StrProcPrint()]
 )
 
 input_data = [
