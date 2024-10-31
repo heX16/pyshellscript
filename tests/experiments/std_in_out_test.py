@@ -106,21 +106,33 @@ class StrProcPrint(StrProcTransit):
         print(f'print: "{s}"')
         super().input(s)
 
+
+class StrProcPrintFinal(StrProcTransit):
+    def input(self, s: str):
+        print(f'print: "{s}"')
+
     @staticmethod
     def class_flags() -> Set[StrProcFlags]:
         return {StrProcFlags.no_output}
 
 
+class StrProcNull(StrProcTransit):
+    def input(self, s: str):
+        pass
+
+    @staticmethod
+    def class_flags() -> Set[StrProcFlags]:
+        return {StrProcFlags.no_output, StrProcFlags.is_infinity_input}
+
+
 class StrProcRemoveControlChars(StrProcTransit):
-    _delete_chars = None
     _trans_table = None
 
     def __init__(self):
         super().__init__()
-        if StrProcRemoveControlChars._delete_chars is None:
-            StrProcRemoveControlChars._delete_chars = ''.join([chr(i) for i in range(32) if i not in (9, 10, 13)])
         if StrProcRemoveControlChars._trans_table is None:
-            StrProcRemoveControlChars._trans_table = str.maketrans('', '', StrProcRemoveControlChars._delete_chars)
+            delete_chars = ''.join([chr(i) for i in range(32) if i not in (9, 10, 13)])
+            StrProcRemoveControlChars._trans_table = str.maketrans('', '', delete_chars)
 
     def input(self, s: str):
         super().input(s.translate(self._trans_table))
