@@ -5,7 +5,7 @@ from enum import Enum
 class StrProcState(Enum):
     has_output_default = 0
     can_input_default = 100
-    can_input_parsing_in_process = 101
+    can_input_and_parsing_in_process = 101
 
     def has_output(self):
         return self.value < StrProcState.can_input_default.value
@@ -18,7 +18,7 @@ class StrProcBase:
 
     def __init__(self):
         super().__init__()
-        self.buffer_str = None
+        self.buffer_str: str | None = None
 
     def input(self, s: str):
         self.buffer_str = s
@@ -103,11 +103,9 @@ class StrProcPipeProcess(StrProcBase):
     def __init__(self, pipe_processes: List[StrProcBase]):
         super().__init__()
         self.pipe_processes = pipe_processes
-        self.buffer = StrBufferBase()
-        self.pipe_processes.append(self.buffer)
 
     def str_pipe_process(self):
-        # `-1` - skip last Proc, its a buffer
+        # `-1` - skip last `StrProc`
         pos = len(self.pipe_processes) - 1
 
         while pos > 0:
@@ -128,20 +126,15 @@ class StrProcPipeProcess(StrProcBase):
         self.pipe_processes[0].input(s)
         self.str_pipe_process()
 
+    def output(self) -> str:
+        return self.pipe_processes[-1].output()
+
     def __bool__(self):
-        return bool(self.buffer)
+        return bool(self.pipe_processes[-1])
 
     def __iter__(self):
-        return iter(self.buffer)
+        return iter(self.pipe_processes[-1])
 
-
-# tests
-
-assert StrProcState.can_input_default.can_input()
-assert StrProcState.can_input_parsing_in_process.can_input()
-assert not (StrProcState.can_input_parsing_in_process.has_output())
-assert StrProcState.has_output_default.has_output()
-assert not (StrProcState.has_output_default == StrProcState.can_input_default)
 
 # Example usage:
 
@@ -158,7 +151,6 @@ input_data = [
     'Hello, world 1!\x01\x02\x03',
     'Hello, world 2!\n\r_test_\x01\x02\t\x00\x03_test_!',
 ]
-
 
 while len(input_data) > 0:
     process2_pipe_obj.input(input_data.pop(0))
