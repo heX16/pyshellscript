@@ -1,6 +1,6 @@
 from typing import List, Set
 from enum import Enum, IntEnum
-
+from abc import ABC, abstractmethod
 
 class StrProcState(Enum):
     has_output_default = 0
@@ -24,7 +24,41 @@ class StrProcFlags(IntEnum):
     has_sub_proc = 6
 
 
-class StrProcBase:
+class AbstractStrProc(ABC):
+    def __init__(self):
+        super().__init__()
+
+    @abstractmethod
+    def input(self, s: str):
+        pass
+
+    @abstractmethod
+    def eof(self):
+        pass
+
+    @abstractmethod
+    def output(self) -> str:
+        pass
+
+    @abstractmethod
+    def state(self) -> StrProcState:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def class_flags() -> Set[StrProcFlags]:
+        pass
+
+    @abstractmethod
+    def __bool__(self):
+        pass
+
+    @abstractmethod
+    def __iter__(self):
+        pass
+
+
+class StrProcTransit(AbstractStrProc):
 
     def __init__(self):
         super().__init__()
@@ -62,12 +96,12 @@ class StrProcBase:
             yield self.output()
 
 
-class StrProcUpper(StrProcBase):
+class StrProcUpper(StrProcTransit):
     def input(self, s: str):
         super().input(s.upper())
 
 
-class StrProcPrint(StrProcBase):
+class StrProcPrint(StrProcTransit):
     def input(self, s: str):
         print(f'print: "{s}"')
         super().input(s)
@@ -77,7 +111,7 @@ class StrProcPrint(StrProcBase):
         return {StrProcFlags.no_output}
 
 
-class StrProcRemoveControlChars(StrProcBase):
+class StrProcRemoveControlChars(StrProcTransit):
     _delete_chars = None
     _trans_table = None
 
@@ -92,7 +126,7 @@ class StrProcRemoveControlChars(StrProcBase):
         super().input(s.translate(self._trans_table))
 
 
-class StrProcReplaceTabs(StrProcBase):
+class StrProcReplaceTabs(StrProcTransit):
     def __init__(self, spaces_per_tab=4):
         super().__init__()
         self.spaces_per_tab = spaces_per_tab
@@ -101,7 +135,7 @@ class StrProcReplaceTabs(StrProcBase):
         super().input(s.replace('\t', ' ' * self.spaces_per_tab))
 
 
-class StrBufferBase(StrProcBase):
+class StrBuffer(AbstractStrProc):
     def __init__(self):
         super().__init__()
         self.buffer: List[str] = []
@@ -122,17 +156,21 @@ class StrBufferBase(StrProcBase):
     def __bool__(self):
         return len(self.buffer) > 0
 
+    def __iter__(self):
+        while self:
+            yield self.output()
+
     @staticmethod
     def class_flags() -> Set[StrProcFlags]:
         return {StrProcFlags.is_infinity_input, StrProcFlags.input_buffer_has_memory_limit}
 
 
-class StrProcPipeProcess(StrProcBase):
-    def __init__(self, pipe_processes: List[StrProcBase]):
+class StrProcPipeProcess(AbstractStrProc):
+    def __init__(self, pipe_processes: List[StrProcTransit]):
         super().__init__()
         self.pipe_processes = pipe_processes
         if StrProcFlags.is_infinity_input not in self.pipe_processes[-1].class_flags():
-            self.pipe_processes.append(StrBufferBase())
+            self.pipe_processes.append(StrBuffer())
 
     def str_pipe_process(self):
         # `-1` - skip last `StrProc`
@@ -193,7 +231,7 @@ class StrProcPipeProcess(StrProcBase):
 
 process2_pipe_obj = StrProcPipeProcess(
     [StrProcRemoveControlChars(), StrProcReplaceTabs(8), StrProcUpper(), StrProcPrint(),
-     StrBufferBase(), StrBufferBase(), StrBufferBase(), StrBufferBase(), StrProcPrint()]
+     StrBuffer(), StrBuffer(), StrBuffer(), StrBuffer(), StrProcPrint()]
 )
 
 input_data = [
