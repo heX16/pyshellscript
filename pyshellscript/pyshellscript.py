@@ -27,7 +27,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.3.1'
+    return '0.3.2'
 
 
 # Global variable ################################################################
@@ -735,8 +735,8 @@ def rename_files_recursively(directory_path: Path | str, search_filename: str, n
 
 
 def find(
-        directory_path: Path | str,
-        search_mask: str,
+        directory_path: Path | str = '.',
+        search_mask: str = '*',
         recursively: bool = False):
     """
     Find files in the specified directory matching the given search mask.
@@ -761,7 +761,7 @@ def find(
             print(str(file))
 
         for file in find('~/', '*', recursively=True):
-            if file.stat().st_size > 1024 * 1024:  # File size more 1 mb
+            if get_file_size(file) > 1024 * 1024:  # File size more 1 mb
                 print(str(file))
 
         files = find('~/', '*', recursively=True)
@@ -775,7 +775,7 @@ def find(
     """
     directory_path = Path(directory_path).expanduser()
     if not directory_path.exists():
-        raise FileNotFoundError(f"The directory {directory_path} does not exist.")
+        raise FileNotFoundError(f'The directory {directory_path} does not exist.')
 
     if recursively:
         return Path(directory_path).rglob(search_mask)
@@ -783,7 +783,7 @@ def find(
         return Path(directory_path).glob(search_mask)
 
 
-def find_dir(directory_path: Path | str, search_mask: str, recursively: bool = False):
+def find_dir(directory_path: Path | str = '.', search_mask: str = '*', recursively: bool = False):
     """
     Find directories in the specified directory matching the given search mask.
 
@@ -817,7 +817,7 @@ def find_dir(directory_path: Path | str, search_mask: str, recursively: bool = F
 
     directory_path = Path(directory_path).expanduser()
     if not directory_path.exists():
-        raise FileNotFoundError(f"The directory {directory_path} does not exist.")
+        raise FileNotFoundError(f'The directory {directory_path} does not exist.')
 
     return dir_generator(directory_path, search_mask, recursively)
 
