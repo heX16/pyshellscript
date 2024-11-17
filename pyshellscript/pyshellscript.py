@@ -802,10 +802,15 @@ def find_dir(directory_path: Path | str = '.', search_mask: str = '*', recursive
 
     Example:
         >>> for directory in find_dir('~/', 'subdir*', recursively=True):
-        >>>    print(str(directory))
+        >>>     print(str(directory))
+
+        >>> for directory in find_dir('~/', 'subdir*', recursively=True):
+        >>>     # Skip directories starting with '.'
+        >>>     if any(part.startswith('.') for part in d.parts):
+        >>>         continue
     """
 
-    def dir_generator(path, mask, recursive):
+    def find_dir_generator(path, mask, recursive):
         if recursive:
             for d in path.rglob(mask):
                 if d.is_dir():
@@ -819,7 +824,7 @@ def find_dir(directory_path: Path | str = '.', search_mask: str = '*', recursive
     if not directory_path.exists():
         raise FileNotFoundError(f'The directory {directory_path} does not exist.')
 
-    return dir_generator(directory_path, search_mask, recursively)
+    return find_dir_generator(directory_path, search_mask, recursively)
 
 
 def get_file_perm(p: Path | str) -> str:
