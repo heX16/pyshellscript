@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyshellscript"
-version = "0.3.2"
+# change in the "pyshellscript/pyshellscript.py" file: `def pyshellscript_version():`
+# and run "build_and_install.py"
+version = "0.3.3"
 requires-python = ">=3.3"
 description = "Library for shell scripting in Python"
 authors = [{name = "heX", email = "hex1625616@gmail.com"}]

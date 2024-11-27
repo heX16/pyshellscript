@@ -27,7 +27,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.3.2'
+    return '0.3.3'
 
 
 # Global variable ################################################################
@@ -810,7 +810,7 @@ def find_dir(directory_path: Path | str = '.', search_mask: str = '*', recursive
 
         >>> for directory in find_dir('~/', 'subdir*', recursively=True):
         >>>     # Skip directories starting with '.'
-        >>>     if any(part.startswith('.') for part in d.parts):
+        >>>     if any(part.startswith('.') for part in directory.parts):
         >>>         continue
     """
 
