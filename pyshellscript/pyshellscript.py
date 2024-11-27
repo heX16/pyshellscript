@@ -16,7 +16,7 @@ from pathlib import Path
 from time import sleep
 from datetime import datetime, time, date, timedelta
 from subprocess import CompletedProcess, Popen
-from typing import Any, Callable, Dict, Set, List, Optional, Union
+from typing import Any, Callable, Dict, Set, List, Optional, Union, Iterable
 
 try:
     import psutil  # pip install psutil
@@ -168,29 +168,33 @@ def get_file_content(file_name: str | Path, encoding='utf-8', ignore_io_error=Fa
             raise
 
 
-def save_file_content(file_name: str | Path, content: str, encoding='utf-8', ignore_io_error=False) -> None:
+def save_file_content(file_name: str | Path, content: str | List[str] | Iterable[str], encoding='utf-8', ignore_io_error=False) -> None:
     """
     Saves the given content to a file.
 
     Args:
         file_name (str | Path): The name or path of the file to write to.
-        content (str): The content to write into the file.
+        content (str | Iterable[str]): The content to write into the file. Can be a string or a list of strings.
         encoding (str): The encoding to use when writing to the file. Defaults to 'utf-8'.
         ignore_io_error (bool): If True, suppresses IOError. Defaults to False.
 
+    Raises:
+        IOError: If there is an error writing to the file and ignore_io_error is False.
+        ValueError: If the content is not of type str or list[str].
+
     Returns:
         None
-
-    Note:
-        If the file is too large, this function might consume a lot of memory when writing.
     """
     try:
         with open(file_name, 'w', encoding=encoding) as f:
-            f.write(content)
+            if isinstance(content, str):
+                f.write(content)
+            elif isinstance(content, Iterable):
+                f.writelines(content)
+            else:
+                raise TypeError("Content must be a string or a list of strings.")
     except IOError:
-        if ignore_io_error:
-            pass
-        else:
+        if not ignore_io_error:
             raise
 
 
