@@ -958,7 +958,6 @@ def get_file_write_time(file_path: Path | str) -> datetime:
     return datetime.fromtimestamp(Path(file_path).stat().st_mtime)
 
 
-# TODO: TEST and DEBUG! WiP
 def set_file_write_time(file_path: Path | str, new_last_modified: datetime):
     file_path = Path(file_path)
 
@@ -986,6 +985,8 @@ def get_file_create_time(file_path: Path | str) -> datetime:
 
 def set_file_create_time(file_path: Path | str, new_create_date: datetime):
     """
+    WARNING: This function is not implemented yet!
+
     Set the creation date of a file.
     Note: This function might not work as expected on Unix-like systems.
 
@@ -997,6 +998,8 @@ def set_file_create_time(file_path: Path | str, new_create_date: datetime):
     if not path.exists() or not path.is_file():
         print(f'The file {path} does not exist or is not a file.')
         return
+
+    raise NotImplementedError('This function is not implemented yet.')
 
     # TODO: implementation for windows
     #  https://github.com/Delgan/win32-setctime

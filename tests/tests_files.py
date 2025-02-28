@@ -3,6 +3,8 @@ from pathlib import Path
 import shutil
 import os
 import sys
+from datetime import datetime, timedelta
+import time
 
 from pyshellscript import *
 
@@ -227,6 +229,106 @@ class TestFileCopyFunctions(unittest.TestCase):
         # Test format_bytes with invalid input
         with self.assertRaises(TypeError):
             format_bytes('not a number')
+
+
+class TestFileTimeFunctions(unittest.TestCase):
+    test_dir = Path('file_time_tests')
+
+    def setUp(self):
+        # Create test directory
+        self.test_dir.mkdir(exist_ok=True)
+        # Create test file
+        self.test_file = self.test_dir / 'test_file.txt'
+        self.test_file.write_text('Test file content')
+
+    def tearDown(self):
+        # Remove test directory after each test
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_get_file_write_time(self):
+        # Test getting file modification time
+        write_time = get_file_write_time(self.test_file)
+
+        # Check that the returned value is a datetime object
+        self.assertIsInstance(write_time, datetime)
+
+        # Check that the time is recent (within the last minute)
+        now = datetime.now()
+        self.assertLess(now - write_time, timedelta(minutes=1))
+
+    def test_set_file_write_time(self):
+        # Test setting file modification time
+        # Set to a time in the past
+        new_time = datetime.now() - timedelta(days=10)
+        set_file_write_time(self.test_file, new_time)
+
+        # Get the time and check it was set correctly
+        current_time = get_file_write_time(self.test_file)
+
+        # Compare with a small tolerance for timestamp conversion
+        self.assertLess(abs(current_time.timestamp() - new_time.timestamp()), 2)
+
+    def test_get_file_create_time(self):
+        # Test getting file creation time
+        create_time = get_file_create_time(self.test_file)
+
+        # Check that the returned value is a datetime object
+        self.assertIsInstance(create_time, datetime)
+
+        # Check that the time is recent (within the last minute)
+        now = datetime.now()
+        self.assertLess(now - create_time, timedelta(minutes=1))
+
+    def test_set_file_create_time_not_implemented(self):
+        # Test that set_file_create_time raises NotImplementedError
+        new_time = datetime.now() - timedelta(days=10)
+
+        with self.assertRaises(NotImplementedError):
+            set_file_create_time(self.test_file, new_time)
+
+    def test_file_time_nonexistent_file(self):
+        # Test behavior with nonexistent file
+        nonexistent_file = self.test_dir / 'nonexistent.txt'
+
+        # get_file_write_time should raise FileNotFoundError
+        with self.assertRaises(FileNotFoundError):
+            get_file_write_time(nonexistent_file)
+
+        # get_file_create_time should raise FileNotFoundError
+        with self.assertRaises(FileNotFoundError):
+            get_file_create_time(nonexistent_file)
+
+    def test_set_write_time_nonexistent_file(self):
+        # Test setting write time on nonexistent file
+        nonexistent_file = self.test_dir / 'nonexistent.txt'
+        new_time = datetime.now() - timedelta(days=10)
+
+        # Function should print error message but not raise exception
+        set_file_write_time(nonexistent_file, new_time)
+        # Verify file still doesn't exist
+        self.assertFalse(nonexistent_file.exists())
+
+    @unittest.skipIf(os.name != 'nt', "This test is Windows-specific")
+    def test_windows_specific_create_time(self):
+        # Test Windows-specific behavior for creation time
+        # Create a new file
+        win_test_file = self.test_dir / 'win_test_file.txt'
+        win_test_file.write_text('Windows test file')
+
+        # Get initial creation time
+        initial_create_time = get_file_create_time(win_test_file)
+
+        # Wait a moment and modify the file
+        time.sleep(1)
+        win_test_file.write_text('Modified content')
+
+        # Get creation time after modification
+        modified_create_time = get_file_create_time(win_test_file)
+
+        # On Windows, creation time should not change when file is modified
+        self.assertEqual(initial_create_time, modified_create_time)
+
 
 if __name__ == '__main__':
     unittest.main()
