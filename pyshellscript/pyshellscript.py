@@ -958,6 +958,7 @@ def get_file_write_time(file_path: Path | str) -> datetime:
     return datetime.fromtimestamp(Path(file_path).stat().st_mtime)
 
 
+# TODO: TEST and DEBUG! WiP
 def set_file_write_time(file_path: Path | str, new_last_modified: datetime):
     file_path = Path(file_path)
 
@@ -1534,7 +1535,7 @@ def run_command(command: str,
     # TODO: add argument `ensure_unique_check_param = True`
     # TODO: add argument `wait_time_if_found = -1`
     # TODO: add argument `timeout = -1`
-    # TODO: add argument `print_result = False` (?)
+    # TODO: add argument `print_result = False` or `print_stdout=False`
 
     global returncode
 
@@ -1610,7 +1611,9 @@ def sh(command_string: str, background=False, capture_output=False, ensure_uniqu
     - If command is one - result of the `run_command` calls.
     - If command is multiline - list of results of the `run_command` calls.
     """
-    # TODO: `stop_on_error=False`
+    # TODO: rename `sh` -> `run_multi()`
+    # TODO: add `stop_on_error=False`
+    # TODO: add `print_stdout=False`
     commands = command_string.strip().split('\n')
     results = []
     for command in commands:
