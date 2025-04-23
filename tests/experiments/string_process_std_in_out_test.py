@@ -1,3 +1,13 @@
+"""
+ANNOUNCEMENT!
+
+IN THE NEXT SEASON! SUPER-DUPER NEW FEATURE!
+String processing with pipe redirection!
+This will be so COOL that `awk` will turn green with envy!
+Get ready for a revolution in the world of text processing!
+Coming soon to all python scripts!
+"""
+
 from typing import List, Set
 from enum import Enum, IntEnum
 from abc import ABC, abstractmethod

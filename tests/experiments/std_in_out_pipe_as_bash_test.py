@@ -1,3 +1,13 @@
+"""
+ANNOUNCEMENT!
+
+IN THE NEXT SEASON! SUPER-DUPER NEW FEATURE!
+Input-output redirection through the ">>" symbol!
+This will be so COOL that `bash` will turn red with envy!
+Get ready for a revolution in the world of console commands!
+Coming soon to all python scripts!
+"""
+
 import subprocess
 
 class ShellCommand:
@@ -66,9 +76,10 @@ class SaveToFile:
         print(f'self (or) - SaveToFile:{self.filename}, other - ...')
         return other
 
-# Example usage
 sh = ShellCommand
 save_to_file = SaveToFile
+
+# Example usage
 
 # Test command:
 sh('ping 127.0.0.1') >> sh('find "Reply"') >> save_to_file('log.txt')
@@ -82,3 +93,24 @@ sh('ping 127.0.0.1') >> sh('find "Reply"') >> save_to_file('log.txt')
 
 #sh('ping 127.0.0.1') >> save_to_file('log.txt')
 
+
+
+"""
+-----------------------------------------
+
+create_process('some.exe').run()
+
+p = create_process('some.exe')
+p.run()
+
+pipe('some1.exe') >> pipe('some2.exe') >> pipe('some3.exe')
+
+p1 = create_process('some1.exe')
+p2 = create_process('some2.exe')
+p3 = create_process('some3.exe')
+p1 >> p2 >> p3
+
+proc_run_bg('some1.exe')
+
+
+"""
