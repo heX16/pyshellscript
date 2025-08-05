@@ -51,7 +51,7 @@ if current_version_match:
         updated_pyproject_text = version_pattern.sub(f'version = "{version}"', pyproject_text)
         # Write the updated content back to pyproject.toml
         pyproject_path.write_text(updated_pyproject_text)
-        print(f'Updated pyproject.toml to version: {version}')
+        print(f'Updated pyproject.toml from {current_version} to {version} version.')
     else:
         print(f'No update needed. Current version is already: {current_version}')
 else:
@@ -59,11 +59,11 @@ else:
     exit(1)
 
 # Extract the updated version from pyproject.toml
-project_version = version
 dist_dir = Path('dist')
-wheel_file = dist_dir / f'pyshellscript-{project_version}-py3-none-any.whl'
+wheel_file = dist_dir / f'pyshellscript-{version}-py3-none-any.whl'
 
 # Build the project
+subprocess.run(['pip', 'install', 'build'])
 subprocess.run(['python', '-m', 'build'])
 
 # Check if the wheel file exists
