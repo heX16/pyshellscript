@@ -1971,24 +1971,16 @@ def datetime_format_readable(time_value: Union[datetime, date, time], format_str
         ('ZZ', '%z'),
     ]
 
-    yy_pos = format_str.find('YY')
-    if yy_pos == -1:
-        yy_pos = format_str.find('YYYY')
-
     # Minutes replacement
     hh_pos = format_str.find('HH')
     if hh_pos != -1:
         mm_pos = format_str.find('MM', hh_pos)
         if mm_pos != -1:
-            # 'MM' is after 'HH' and 'YY' not in between
-            if hh_pos != -1 and hh_pos < mm_pos and not (hh_pos < yy_pos < mm_pos):
-                format_str = _insert(format_str, mm_pos, 'MN')  # minutes
+            format_str = _insert(format_str, mm_pos, 'MN')  # minutes
     
     # Month replacement
     mm_pos = format_str.find('MM')
     if mm_pos != -1:
-        if hh_pos == -1 and yy_pos == -1:
-            raise ValueError('MM is present, but HH and YY are not present')
         format_str = _insert(format_str, mm_pos, 'MO')  # month
     
     # Replace other patterns
