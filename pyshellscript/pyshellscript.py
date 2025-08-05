@@ -2404,8 +2404,26 @@ def load_config_from_json(config_file: Path, default_values: Dict[str, Any]) -> 
         globals()[key] = value
 
 
-# Utils ################################################################
+# Text utils ################################################################
 
+def load_from_yaml(yaml_file: Union[Path, str], encoding: str = 'utf-8') -> Dict:
+    import yaml
+
+    with open(Path(yaml_file), 'r', encoding=encoding) as f:
+        store = yaml.safe_load(f)
+    return store
+
+def save_to_yaml(yaml_file: Union[Path, str], data: Dict, encoding: str = 'utf-8', check_file_content: bool = True) -> None:
+    import yaml
+
+    data = yaml.dump(data, default_flow_style=False, allow_unicode=True)
+    if (check_file_content == False or
+        (check_file_content and get_file_content(yaml_file, encoding=encoding) != data)):
+        
+        with open(yaml_file, 'w', encoding=encoding) as f:
+            f.write(data)
+
+# Utils ################################################################
 
 def contains_path_glob_pattern(input_string):
     # Detect a regular expression pattern to match Path.glob or Path.rglob patterns
