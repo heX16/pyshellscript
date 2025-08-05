@@ -27,7 +27,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.4.0'
+    return '0.4.1'
 
 
 # Global variable ################################################################
@@ -1991,62 +1991,24 @@ def datetime_to_str(time_value: Union[datetime, date, time], format_str: str) ->
         Converts readable patterns to C standard (1989) strftime() format codes internally.
         (Converts example: 'YYYY-MO-DD HH:MN' -> '%Y-%m-%d %H:%M'.)
     """
-
-    return time_value.strftime(_datetime_format_readable_to_strftime(format_str))
-    
-
-def _datetime_format(
-        strftime: str,
-        time_value: Union[datetime, date],
-        delimiter_date: str = '-',
-        delimiter_time: str = ':',
-        delimiter_date_time: str = ' ',
-        delimiter: Union[str, None] = None
-) -> str:
     if isinstance(time_value, (datetime, date)):
-        d_t = delimiter_time
-        d_d = delimiter_date
-        d_dt = delimiter_date_time
-        if delimiter is not None:
-            d_t = delimiter
-            d_d = delimiter
-        # Convert delimiter variables to text
-        strftime = strftime.format(d_d=d_d, d_t=d_t, d_dt=d_dt)
-        return time_value.strftime(strftime)
+        return time_value.strftime(_datetime_format_readable_to_strftime(format_str))
     else:
         raise TypeError('Invalid type: expected datetime or date.')
 
 
-def datetime_to_yyyy_mm_dd_hh_mm_ss(
-        time_value: Union[datetime, date],
-        delimiter_date: str = '-',
-        delimiter_time: str = ':',
-        delimiter_date_time: str = ' ',
-        delimiter: Union[str, None] = None
-) -> str:
+def datetime_to_yyyy_mm_dd_hh_mm_ss(time_value: Union[datetime, date]) -> str:
     """
     Convert time to 'YYYY-MM-DD HH:MM:SS' format.
     """
-    return _datetime_format(
-        strftime='%Y{d_d}%m{d_d}%d{d_dt}%H{d_t}%M{d_t}%S',
-        **locals()
-    )
+    return datetime_to_str(time_value, 'YYYY-MM-DD HH:MM:SS')
 
 
-def datetime_to_yyyy_mm_dd_hh_mm(
-        time_value: Union[datetime, date],
-        delimiter_date: str = '-',
-        delimiter_time: str = ':',
-        delimiter_date_time: str = ' ',
-        delimiter: Union[str, None] = None
-) -> str:
+def datetime_to_yyyy_mm_dd_hh_mm(time_value: Union[datetime, date]) -> str:
     """
     Convert time to 'YYYY-MM-DD HH:MM' format.
     """
-    return _datetime_format(
-        strftime='%Y{d_d}%m{d_d}%d{d_dt}%H{d_t}%M',
-        **locals()
-    )
+    return datetime_to_str(time_value, 'YYYY-MM-DD HH:MM')
 
 
 def datetime_to_yyyy_mm_dd(
@@ -2058,40 +2020,31 @@ def datetime_to_yyyy_mm_dd(
         > datetime_to_yyyy_mm_dd(now())
         > '2024-12-16'
     """
-    if isinstance(time_value, (datetime, date)):
-        return time_value.strftime(f'%Y{delimiter}%m{delimiter}%d')
-    else:
-        raise TypeError('Invalid type: expected datetime or date.')
+    return datetime_to_str(time_value, f'YYYY{delimiter}MO{delimiter}DD')
 
 
 def datetime_to_hh_mm_ss(
         time_value: Union[datetime, time], 
-        delimiter: str = '-') -> str:
+        delimiter: str = ':') -> str:
     """
-    Convert time to 'HH-MM-SS' format.
+    Convert time to 'HH:MM:SS' format.
     Example:
         > datetime_to_hh_mm_ss(datetime.now(), delimiter=':')
         > '08:16:32'
     """
-    if isinstance(time_value, (datetime, time)):
-        return time_value.strftime(f'%H{delimiter}%M{delimiter}%S')
-    else:
-        raise TypeError('Invalid type: expected datetime or time.')
+    return datetime_to_str(time_value, f'HH{delimiter}MN{delimiter}SS')
 
 
 def datetime_to_hh_mm(
         time_value: Union[datetime, time], 
-        delimiter: str = '-') -> str:
+        delimiter: str = ':') -> str:
     """
-    Convert time to 'HH-MM' format.
+    Convert time to 'HH:MM' format.
     Example:
         > datetime_to_hh_mm(datetime.now(), delimiter=':')
         > '08:16'
     """
-    if isinstance(time_value, (datetime, time)):
-        return time_value.strftime(f'%H{delimiter}%M')
-    else:
-        raise TypeError('Invalid type: expected datetime or time.')
+    return datetime_to_str(time_value, f'HH{delimiter}MN')
 
 
 def get_datetime() -> datetime:
