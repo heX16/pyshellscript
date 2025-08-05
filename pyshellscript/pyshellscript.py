@@ -1969,7 +1969,7 @@ def _datetime_format_readable_to_strftime(format_str: str) -> str:
     return format_str
    
 
-def datetime_format_readable(time_value: Union[datetime, date, time], format_str: str) -> str:
+def datetime_to_str(time_value: Union[datetime, date, time], format_str: str) -> str:
     """
     Format datetime using human-readable format strings.
     
@@ -2049,7 +2049,9 @@ def datetime_to_yyyy_mm_dd_hh_mm(
     )
 
 
-def datetime_to_yyyy_mm_dd(time_value: Union[datetime, date], delimiter: str = '-') -> str:
+def datetime_to_yyyy_mm_dd(
+        time_value: Union[datetime, date], 
+        delimiter: str = '-') -> str:
     """
     Convert time to 'YYYY-MM-DD' format.
     Example:
@@ -2062,7 +2064,9 @@ def datetime_to_yyyy_mm_dd(time_value: Union[datetime, date], delimiter: str = '
         raise TypeError('Invalid type: expected datetime or date.')
 
 
-def datetime_to_hh_mm_ss(time_value: Union[datetime, time], delimiter: str = '-') -> str:
+def datetime_to_hh_mm_ss(
+        time_value: Union[datetime, time], 
+        delimiter: str = '-') -> str:
     """
     Convert time to 'HH-MM-SS' format.
     Example:
@@ -2075,7 +2079,9 @@ def datetime_to_hh_mm_ss(time_value: Union[datetime, time], delimiter: str = '-'
         raise TypeError('Invalid type: expected datetime or time.')
 
 
-def datetime_to_hh_mm(time_value: Union[datetime, time], delimiter: str = '-') -> str:
+def datetime_to_hh_mm(
+        time_value: Union[datetime, time], 
+        delimiter: str = '-') -> str:
     """
     Convert time to 'HH-MM' format.
     Example:
