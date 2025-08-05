@@ -1934,28 +1934,7 @@ def datetime_trim_time(t: datetime) -> datetime:
         raise TypeError("Unsupported type for t. Expected datetime.")
 
 
-def datetime_format_readable(time_value: Union[datetime, date, time], format_str: str) -> str:
-    """
-    Format datetime using human-readable format strings.
-    
-    Simplified alternative to strftime() codes. Instead of cryptic '%Y-%m-%d %H:%M:%S', 
-    use intuitive 'YYYY-MM-DD HH:MM:SS'.
-    
-    Supported patterns: 
-        YYYY/YY:MM/MO:DD, HH:MM/MN, SS, ZZ
-
-    Examples:
-        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'HH:MM')
-        '14:30'
-        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'YYYY-MM-DD')
-        '2024-01-15'
-        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'YYYY-MM-DD HH:MM:SS')
-        '2024-01-15 14:30:00'
-    
-    Note:
-        Converts readable patterns to C standard (1989) strftime() format codes internally.
-        (Converts example: 'YYYY-MM-DD HH:MM' -> '%Y-%m-%d %H:%M'.)
-    """
+def _datetime_format_readable_to_strftime(format_str: str) -> str:
 
     def _insert(text: str, index: int, overwrite_str: str) -> str:
         return text[:index] + overwrite_str + text[index+len(overwrite_str):]
@@ -1965,7 +1944,7 @@ def datetime_format_readable(time_value: Union[datetime, date, time], format_str
         ('YY', '%y'),
         ('MO', '%m'),  # explicit month. But you can write 'MM'
         ('DD', '%d'),
-        ('HH', '%H'),   # 'HH' before 'MM' - important for hour_replaced flag
+        ('HH', '%H'),
         ('MN', '%M'),  # explicit minutes. But you can write 'MM'
         ('SS', '%S'),
         ('ZZ', '%z'),
@@ -1986,8 +1965,34 @@ def datetime_format_readable(time_value: Union[datetime, date, time], format_str
     # Replace other patterns
     for k, v in mapping:
         format_str = format_str.replace(k, v, 1)
+
+    return format_str
+   
+
+def datetime_format_readable(time_value: Union[datetime, date, time], format_str: str) -> str:
+    """
+    Format datetime using human-readable format strings.
     
-    return time_value.strftime(format_str)
+    Simplified alternative to strftime() codes. Instead of cryptic '%Y-%m-%d %H:%M:%S', 
+    use intuitive 'YYYY-MM-DD HH:MM:SS'.
+    
+    Supported patterns: 
+        YYYY/YY, MO/MM, DD, HH, MN/MM, SS, ZZ
+
+    Examples:
+        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'HH:MM')
+        '14:30'
+        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'YYYY-MM-DD')
+        '2024-01-15'
+        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'YYYY-MM-DD HH:MM:SS')
+        '2024-01-15 14:30:00'
+    
+    Note:
+        Converts readable patterns to C standard (1989) strftime() format codes internally.
+        (Converts example: 'YYYY-MO-DD HH:MN' -> '%Y-%m-%d %H:%M'.)
+    """
+
+    return time_value.strftime(_datetime_format_readable_to_strftime(format_str))
     
 
 def _datetime_format(
