@@ -27,7 +27,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.3.3'
+    return '0.4.0'
 
 
 # Global variable ################################################################
@@ -1933,6 +1933,70 @@ def datetime_trim_time(t: datetime) -> datetime:
     else:
         raise TypeError("Unsupported type for t. Expected datetime.")
 
+
+def datetime_format_readable(time_value: Union[datetime, date, time], format_str: str) -> str:
+    """
+    Format datetime using human-readable format strings.
+    
+    Simplified alternative to strftime() codes. Instead of cryptic '%Y-%m-%d %H:%M:%S', 
+    use intuitive 'YYYY-MM-DD HH:MM:SS'.
+    
+    Supported patterns: 
+        YYYY/YY:MM/MO:DD, HH:MM/MN, SS, ZZ
+
+    Examples:
+        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'HH:MM')
+        '14:30'
+        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'YYYY-MM-DD')
+        '2024-01-15'
+        >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'YYYY-MM-DD HH:MM:SS')
+        '2024-01-15 14:30:00'
+    
+    Note:
+        Converts readable patterns to C standard (1989) strftime() format codes internally.
+        (Converts example: 'YYYY-MM-DD HH:MM' -> '%Y-%m-%d %H:%M'.)
+    """
+
+    def _insert(text: str, index: int, overwrite_str: str) -> str:
+        return text[:index] + overwrite_str + text[index+len(overwrite_str):]
+    
+    mapping = [
+        ('YYYY', '%Y'),
+        ('YY', '%y'),
+        ('MO', '%m'),  # explicit month. But you can write 'MM'
+        ('DD', '%d'),
+        ('HH', '%H'),   # 'HH' before 'MM' - important for hour_replaced flag
+        ('MN', '%M'),  # explicit minutes. But you can write 'MM'
+        ('SS', '%S'),
+        ('ZZ', '%z'),
+    ]
+
+    yy_pos = format_str.find('YY')
+    if yy_pos == -1:
+        yy_pos = format_str.find('YYYY')
+
+    # Minutes replacement
+    hh_pos = format_str.find('HH')
+    if hh_pos != -1:
+        mm_pos = format_str.find('MM', hh_pos)
+        if mm_pos != -1:
+            # 'MM' is after 'HH' and 'YY' not in between
+            if hh_pos != -1 and hh_pos < mm_pos and not (hh_pos < yy_pos < mm_pos):
+                format_str = _insert(format_str, mm_pos, 'MN')  # minutes
+    
+    # Month replacement
+    mm_pos = format_str.find('MM')
+    if mm_pos != -1:
+        if hh_pos == -1 and yy_pos == -1:
+            raise ValueError('MM is present, but HH and YY are not present')
+        format_str = _insert(format_str, mm_pos, 'MO')  # month
+    
+    # Replace other patterns
+    for k, v in mapping:
+        format_str = format_str.replace(k, v, 1)
+    
+    return time_value.strftime(format_str)
+    
 
 def _datetime_format(
         strftime: str,
