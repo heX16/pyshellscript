@@ -2298,6 +2298,18 @@ def dict_cast_values(dict_values: Dict[str, Any], default_values: Dict[str, Any]
     return dict_values_casted
 
 
+def _set_global_variables(config: Dict[str, Any]) -> None:
+    """
+    Set global variables from config dictionary.
+    
+    Parameters:
+    config (Dict[str, Any]): Configuration dictionary
+    """
+    for key, value in config.items():
+        # Set the global variable
+        globals()[key] = value
+
+
 def load_config_from_yaml(config_file: Path, default_values: Dict[str, Any]) -> None:
     """
     Load config from YAML file or create with defaults. Set global variables.
@@ -2327,9 +2339,7 @@ def load_config_from_yaml(config_file: Path, default_values: Dict[str, Any]) -> 
     # Apply casting for all default values
     casted_config = dict_cast_values(config, default_values)
 
-    for key, value in casted_config.items():
-        # Set the global variable
-        globals()[key] = value
+    _set_global_variables(casted_config)
 
 
 def load_config_from_ini(config_file: Path, default_values: Dict[str, Any], section_name: str = 'DEFAULT') -> None:
@@ -2365,9 +2375,7 @@ def load_config_from_ini(config_file: Path, default_values: Dict[str, Any], sect
     # Apply casting for all default values
     casted_config = dict_cast_values(dict(config[section_name]), default_values)
 
-    for key, value in casted_config.items():
-        # Set the global variable
-        globals()[key] = value
+    _set_global_variables(casted_config)
 
 
 def load_config_from_json(config_file: Path, default_values: Dict[str, Any]) -> None:
@@ -2399,9 +2407,7 @@ def load_config_from_json(config_file: Path, default_values: Dict[str, Any]) -> 
     # Apply casting for all default values
     casted_config = dict_cast_values(config, default_values)
 
-    for key, value in casted_config.items():
-        # Set the global variable
-        globals()[key] = value
+    _set_global_variables(casted_config)
 
 
 # Text utils ################################################################
