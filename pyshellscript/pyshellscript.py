@@ -471,7 +471,10 @@ def copy_file(source_file: Path | str, destination_dir: Path | str):
 
     # Copy the file to the destination directory
     shutil.copy2(source_path, destination_path)
-    set_file_create_time(destination_path, get_file_create_time(source_path))
+
+    print('WARN: This function is not implemented yet.')
+    print('      set_file_write_time(disk_h_file_backup, current_time)')
+    # TODO: set_file_create_time(destination_path, get_file_create_time(source_path))
     # log(f'File {source_path} copied to {destination_path}')
 
 
@@ -615,7 +618,7 @@ def copy_file_with_progress(source_path: Path | str, destination_path: Path | st
                     raise
 
         shutil.copystat(source_path, destination_path, follow_symlinks=follow_symlinks)
-        set_file_create_time(destination_path, get_file_create_time(source_path))
+        # TODO: set_file_create_time(destination_path, get_file_create_time(source_path))
 
 
 def format_bytes(byte_count, kibi=False):
@@ -1199,10 +1202,10 @@ def file_list_calc_total_size(file_list: List[Union[Path, str]]) -> int:
 
 
 def file_list_filter_by_flags(
-        file_list: List[Union[Path, str]],
-        existing=True,
-        only_files=True,
-        only_dir=False,
+        file_list: Iterable[Union[Path, str]],
+        existing=None,
+        only_files=None,
+        only_dir=None,
         readable=None,
         writable=None,
         executable=None,
@@ -1210,8 +1213,6 @@ def file_list_filter_by_flags(
         symlinks=None,
         size_greater_than=None,
         size_less_than=None,
-        modified_before=None,
-        modified_after=None,
         extension=None,
         file_type=None,
         mtime_before=None,
@@ -1221,66 +1222,143 @@ def file_list_filter_by_flags(
         ctime_before=None,
         ctime_after=None,
         empty=None,
+        maxdepth=None,
+        mindepth=None,
 ) -> List[Path]:
     """
     Filters the given list of files or directories based on specified criteria.
+    
+    This function is Python analog of the Linux 'find' command.
+    Each parameter has a corresponding parameter in the 'find' command
+    (see the 'Find analog:' line in the documentation).
 
     Parameters:
-    file_list (List[Union[Path, str]]): List of Path objects or strings representing the files or directories.
-    existing (bool): If True, include only existing files or directories. Default is True.
-    only_files (bool): If True, include only files. Default is True.
-    only_dir (bool): If True, include only directories. If set to True, only_files is ignored. Default is False.
-    readable (bool, optional): If True, include only readable files or directories. Default is None.
-    writable (bool, optional): If True, include only writable files or directories. Default is None.
-    executable (bool, optional): If True, include only executable files or directories. Default is None.
-    hidden (bool, optional): If True, include only hidden files or directories. Default is None.
-    symlinks (bool, optional): If True, include only symbolic links. Default is None.
-    size_greater_than (int, optional): Include only files larger than this size (in bytes). Default is None.
-    size_less_than (int, optional): Include only files smaller than this size (in bytes). Default is None.
-    modified_before (datetime, optional): Include only files modified before this date. Default is None.
-    modified_after (datetime, optional): Include only files modified after this date. Default is None.
-    extension (str, optional): Include only files with this extension. Default is None.
-    file_type (str, optional): Include only files of this type ('f' for files, 'd' for directories, 'l' for symlinks).
-    mtime_before (datetime, optional): Include only files modified before this date. Default is None.
-    mtime_after (datetime, optional): Include only files modified after this date. Default is None.
-    atime_before (datetime, optional): Include only files accessed before this date. Default is None.
-    atime_after (datetime, optional): Include only files accessed after this date. Default is None.
-    ctime_before (datetime, optional): Include only files changed before this date. Default is None.
-    ctime_after (datetime, optional): Include only files changed after this date. Default is None.
-    empty (bool, optional): Include only empty files or directories. Default is None.
-    maxdepth (int, optional): Maximum depth of directories to include. Default is None.
-    mindepth (int, optional): Minimum depth of directories to include. Default is None.
+    file_list (Iterable[Union[Path, str]]):
+        File and directory paths to filter.
+        Array of strings. 
+        Or array of `Path` objects (`Path` are recommended).
+        Instead of arrays, can be iterators (such as `Path.iterdir()`).
+        Find analog: PATH argument
+    existing (bool, optional): 
+        Filter by existing.
+        Can be `True` or `False` or `None`. Default is None.
+        If None, do not filter by existing.
+        If True, include only existing files or directories. 
+        If False, include only non-existing (useful for searching for files that do not exist).
+        Find analog: no direct analog (find searches existing files by default)
+    only_files (bool, optional):
+        Filter by files.
+        Can be `True` or `False` or `None`. Default is None.
+        If None, do not filter by file type.
+        If True, include only files.
+        If False, include only non-files (directories, symlinks, etc.).
+        Find analog: "-type f"
+    only_dir (bool, optional):
+        Filter by directories.
+        Can be `True` or `False` or `None`. Default is None.
+        If None, do not filter by directory type.
+        If True, include only directories.
+        If False, include only non-directories.
+        Find analog: "-type d"
+    readable (bool, optional):
+        Filter by readable files or directories.
+        If True, include only readable files or directories. Default is None.
+        Find analog: "-readable"
+    writable (bool, optional):
+        Filter by writable files or directories.
+        If True, include only writable files or directories. Default is None.
+        Find analog: "-writable"
+    executable (bool, optional):
+        Filter by executable files or directories.
+        If True, include only executable files or directories. Default is None.
+        Find analog: "-executable"
+    hidden (bool, optional):
+        Filter by hidden files or directories.
+        If True, include only hidden files or directories. Default is None.
+        Find analog: "-name '.*'"
+    symlinks (bool, optional):
+        Filter by symbolic links.
+        If True, include only symbolic links. Default is None.
+        Find analog: "-type l"
+    size_greater_than (int, optional):
+        Filter by file size.
+        Include only files larger than this size (in bytes). Default is None.
+        Find analog: "-size +Nc"
+    size_less_than (int, optional):
+        Filter by file size.
+        Include only files smaller than this size (in bytes). Default is None.
+        Find analog: "-size -Nc"
+    extension (str, optional):
+        Filter by file extension.
+        Include only files with this extension. Default is None.
+        Find analog: "-name '*.ext'"
+    file_type (str, optional):
+        Filter by file type.
+        Include only files of this type ('f' for files, 'd' for directories, 'l' for symlinks). Default is None.
+        Find analog: "-type {f|d|l}"
+    mtime_before (datetime, optional):
+        Filter by modification time.
+        Include only files modified before this date. Default is None.
+        Find analog: "-mtime +N"
+    mtime_after (datetime, optional):
+        Filter by modification time.
+        Include only files modified after this date. Default is None.
+        Find analog: "-mtime -N"
+    atime_before (datetime, optional):
+        Filter by access time.
+        Include only files accessed before this date. Default is None.
+        Find analog: "-atime +N"
+    atime_after (datetime, optional):
+        Filter by access time.
+        Include only files accessed after this date. Default is None.
+        Find analog: "-atime -N"
+    ctime_before (datetime, optional):
+        Filter by change time.
+        Include only files changed before this date. Default is None.
+        Find analog: "-ctime +N"
+    ctime_after (datetime, optional):
+        Filter by change time.
+        Include only files changed after this date. Default is None.
+        Find analog: "-ctime -N"
+    empty (bool, optional):
+        Filter by empty files or directories.
+        If True, include only empty files or directories. Default is None.
+        Find analog: "-empty"
+
+    maxdepth (int, optional): 
+        Maximum depth of directories to include. 
+        Default is None.
+        Find analog: "-maxdepth N"
+    mindepth (int, optional): 
+        Minimum depth of directories to include. 
+        Default is None.
+        Find analog: "-mindepth N"
 
     Returns:
     List[Path]: List of Path objects that match the specified criteria.
     """
-    # TODO: maxdepth = None,
-    # TODO: mindepth = None
-
     res = []
-    if only_dir:
-        only_files = False
 
     for file_path in file_list:
         if isinstance(file_path, str):
             file_path = Path(file_path)
 
-        if existing and not file_path.exists():
+        if existing is not None and file_path.exists() != existing:
             continue
 
-        if only_files and not file_path.is_file():
+        if only_files is not None and file_path.is_file() != only_files:
             continue
 
-        if only_dir and not file_path.is_dir():
+        if only_dir is not None and file_path.is_dir() != only_dir:
             continue
 
-        if readable is not None and not os.access(file_path, os.R_OK):
+        if readable is not None and os.access(file_path, os.R_OK) != readable:
             continue
 
-        if writable is not None and not os.access(file_path, os.W_OK):
+        if writable is not None and os.access(file_path, os.W_OK) != writable:
             continue
 
-        if executable is not None and not os.access(file_path, os.X_OK):
+        if executable is not None and os.access(file_path, os.X_OK) != executable:
             continue
 
         if hidden is not None and file_path.name.startswith('.') != hidden:
@@ -1293,14 +1371,6 @@ def file_list_filter_by_flags(
             continue
 
         if size_less_than is not None and file_path.is_file() and file_path.stat().st_size >= size_less_than:
-            continue
-
-        if modified_before is not None and file_path.is_file() and datetime.fromtimestamp(
-                file_path.stat().st_mtime) >= modified_before:
-            continue
-
-        if modified_after is not None and file_path.is_file() and datetime.fromtimestamp(
-                file_path.stat().st_mtime) <= modified_after:
             continue
 
         if extension is not None and file_path.suffix != extension:
@@ -1337,11 +1407,21 @@ def file_list_filter_by_flags(
         if empty and file_path.is_dir() and any(file_path.iterdir()):
             continue
 
+        # Check depth constraints
+        if maxdepth is not None or mindepth is not None:
+            depth = len(file_path.parts)
+            
+            if maxdepth is not None and depth > maxdepth:
+                continue
+                
+            if mindepth is not None and depth < mindepth:
+                continue
+
         res.append(file_path)
     return res
 
 
-def filter_by_user_group_perm(
+def file_list_filter_by_user_group_perm(
         file_list: List[Union[Path, str]],
         user: Union[str, int, None] = None,
         group: Union[str, int, None] = None,
@@ -2328,7 +2408,7 @@ def load_config_from_json(config_file: Path, default_values: Dict[str, Any]) -> 
 
 
 def contains_path_glob_pattern(input_string):
-    # Define a regular expression pattern to match Path.glob or Path.rglob patterns
+    # Detect a regular expression pattern to match Path.glob or Path.rglob patterns
     glob_pattern = r'[*?[]'
     match = re.search(glob_pattern, input_string)
     return bool(match)
