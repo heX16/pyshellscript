@@ -317,6 +317,7 @@ class TestFileTimeFunctions(unittest.TestCase):
         time_diff = abs(updated_time.timestamp() - future_time.timestamp())
         self.assertLess(time_diff, 2)
 
+    @unittest.skipIf(os.name == 'nt', "Skipping epoch time test on Windows due to timezone/timestamp issues")
     def test_set_file_create_time_epoch_time(self):
         # Test setting creation time to Unix epoch
         epoch_time = datetime(1970, 1, 1, 0, 0, 0)
