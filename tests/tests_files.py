@@ -4,7 +4,7 @@ import shutil
 import os
 import sys
 from datetime import datetime, timedelta
-import time
+import time as time_module
 
 from pyshellscript import *
 
@@ -280,12 +280,176 @@ class TestFileTimeFunctions(unittest.TestCase):
         now = datetime.now()
         self.assertLess(now - create_time, timedelta(minutes=1))
 
-    def test_set_file_create_time_not_implemented(self):
-        # Test that set_file_create_time raises NotImplementedError
-        new_time = datetime.now() - timedelta(days=10)
+    def test_set_file_create_time_basic_functionality(self):
+        # Test basic functionality - setting creation time and verifying it was set
+        original_create_time = get_file_create_time(self.test_file)
+        new_time = datetime(2020, 5, 15, 10, 30, 0)
+        
+        # Set new creation time
+        set_file_create_time(self.test_file, new_time)
+        
+        # Get creation time after setting
+        updated_create_time = get_file_create_time(self.test_file)
+        
+        # Verify the creation time was actually changed
+        # Allow small tolerance for timestamp conversion (within 2 seconds)
+        time_diff = abs(updated_create_time.timestamp() - new_time.timestamp())
+        self.assertLess(time_diff, 2, 
+                       f"Creation time not set correctly. Expected: {new_time}, Got: {updated_create_time}")
 
-        with self.assertRaises(NotImplementedError):
-            set_file_create_time(self.test_file, new_time)
+    def test_set_file_create_time_past_date(self):
+        # Test setting creation time to a date in the past
+        past_time = datetime(2018, 1, 1, 0, 0, 0)
+        
+        set_file_create_time(self.test_file, past_time)
+        
+        updated_time = get_file_create_time(self.test_file)
+        time_diff = abs(updated_time.timestamp() - past_time.timestamp())
+        self.assertLess(time_diff, 2)
+
+    def test_set_file_create_time_future_date(self):
+        # Test setting creation time to a date in the future
+        future_time = datetime.now() + timedelta(days=30)
+        
+        set_file_create_time(self.test_file, future_time)
+        
+        updated_time = get_file_create_time(self.test_file)
+        time_diff = abs(updated_time.timestamp() - future_time.timestamp())
+        self.assertLess(time_diff, 2)
+
+    def test_set_file_create_time_epoch_time(self):
+        # Test setting creation time to Unix epoch
+        epoch_time = datetime(1970, 1, 1, 0, 0, 0)
+        
+        set_file_create_time(self.test_file, epoch_time)
+        
+        updated_time = get_file_create_time(self.test_file)
+        time_diff = abs(updated_time.timestamp() - epoch_time.timestamp())
+        self.assertLess(time_diff, 2)
+
+    def test_set_file_create_time_microseconds_precision(self):
+        # Test setting creation time with microseconds precision
+        precise_time = datetime(2022, 6, 15, 14, 30, 45, 123456)
+        
+        set_file_create_time(self.test_file, precise_time)
+        
+        updated_time = get_file_create_time(self.test_file)
+        # For microseconds precision, allow slightly larger tolerance
+        time_diff = abs(updated_time.timestamp() - precise_time.timestamp())
+        self.assertLess(time_diff, 2)
+
+    def test_set_file_create_time_multiple_changes(self):
+        # Test changing creation time multiple times
+        time1 = datetime(2020, 1, 1, 12, 0, 0)
+        time2 = datetime(2021, 6, 15, 18, 30, 0)
+        time3 = datetime(2019, 12, 31, 23, 59, 59)
+        
+        # First change
+        set_file_create_time(self.test_file, time1)
+        updated_time1 = get_file_create_time(self.test_file)
+        self.assertLess(abs(updated_time1.timestamp() - time1.timestamp()), 2)
+        
+        # Second change
+        set_file_create_time(self.test_file, time2)
+        updated_time2 = get_file_create_time(self.test_file)
+        self.assertLess(abs(updated_time2.timestamp() - time2.timestamp()), 2)
+        
+        # Third change
+        set_file_create_time(self.test_file, time3)
+        updated_time3 = get_file_create_time(self.test_file)
+        self.assertLess(abs(updated_time3.timestamp() - time3.timestamp()), 2)
+
+    def test_set_file_create_time_different_file_types(self):
+        # Test with different file types
+        
+        # Text file
+        txt_file = self.test_dir / 'test.txt'
+        txt_file.write_text('Text content')
+        new_time = datetime(2020, 3, 10, 15, 45, 0)
+        set_file_create_time(txt_file, new_time)
+        updated_time = get_file_create_time(txt_file)
+        self.assertLess(abs(updated_time.timestamp() - new_time.timestamp()), 2)
+        
+        # Binary file
+        bin_file = self.test_dir / 'test.bin'
+        bin_file.write_bytes(b'\x00\x01\x02\x03\xFF')
+        set_file_create_time(bin_file, new_time)
+        updated_time = get_file_create_time(bin_file)
+        self.assertLess(abs(updated_time.timestamp() - new_time.timestamp()), 2)
+        
+        # Empty file
+        empty_file = self.test_dir / 'empty.txt'
+        empty_file.touch()
+        set_file_create_time(empty_file, new_time)
+        updated_time = get_file_create_time(empty_file)
+        self.assertLess(abs(updated_time.timestamp() - new_time.timestamp()), 2)
+
+    def test_set_file_create_time_large_file(self):
+        # Test with large file
+        large_file = self.test_dir / 'large_file.dat'
+        large_content = b'X' * (5 * 1024 * 1024)  # 5 MB file
+        large_file.write_bytes(large_content)
+        
+        new_time = datetime(2019, 8, 20, 11, 15, 30)
+        set_file_create_time(large_file, new_time)
+        
+        updated_time = get_file_create_time(large_file)
+        self.assertLess(abs(updated_time.timestamp() - new_time.timestamp()), 2)
+
+    def test_set_file_create_time_path_vs_string(self):
+        # Test that function works the same with Path objects and strings
+        new_time = datetime(2021, 12, 25, 0, 0, 0)
+        
+        # Test with Path object
+        set_file_create_time(self.test_file, new_time)
+        time_from_path = get_file_create_time(self.test_file)
+        
+        # Reset file
+        self.test_file.touch()
+        
+        # Test with string path
+        set_file_create_time(str(self.test_file), new_time)
+        time_from_string = get_file_create_time(self.test_file)
+        
+        # Both should result in the same time
+        self.assertLess(abs(time_from_path.timestamp() - time_from_string.timestamp()), 1)
+
+    def test_set_file_create_time_preserve_other_times(self):
+        # Test that setting creation time doesn't affect modification time
+        original_mod_time = get_file_write_time(self.test_file)
+        new_create_time = datetime(2018, 6, 1, 10, 0, 0)
+        
+        set_file_create_time(self.test_file, new_create_time)
+        
+        # Check creation time was set
+        updated_create_time = get_file_create_time(self.test_file)
+        self.assertLess(abs(updated_create_time.timestamp() - new_create_time.timestamp()), 2)
+        
+        # Check modification time wasn't significantly changed
+        current_mod_time = get_file_write_time(self.test_file)
+        # Allow some tolerance as the operation might slightly touch mod time
+        self.assertLess(abs(current_mod_time.timestamp() - original_mod_time.timestamp()), 60)
+
+    def test_set_file_create_time_nonexistent_file(self):
+        # Test behavior with nonexistent file - should handle gracefully
+        nonexistent_file = self.test_dir / 'does_not_exist.txt'
+        new_time = datetime(2020, 1, 1, 0, 0, 0)
+        
+        # Function should handle this gracefully (print message, return)
+        # Should not raise an exception
+        set_file_create_time(nonexistent_file, new_time)
+        
+        # File should still not exist
+        self.assertFalse(nonexistent_file.exists())
+
+    def test_set_file_create_time_directory_error(self):
+        # Test that function correctly rejects directories
+        test_dir = self.test_dir / 'test_subdir'
+        test_dir.mkdir()
+        new_time = datetime(2020, 1, 1, 0, 0, 0)
+        
+        # Function should handle this gracefully (print message, return)
+        set_file_create_time(test_dir, new_time)
 
     def test_file_time_nonexistent_file(self):
         # Test behavior with nonexistent file
@@ -320,7 +484,7 @@ class TestFileTimeFunctions(unittest.TestCase):
         initial_create_time = get_file_create_time(win_test_file)
 
         # Wait a moment and modify the file
-        time.sleep(1)
+        time_module.sleep(1)
         win_test_file.write_text('Modified content')
 
         # Get creation time after modification
