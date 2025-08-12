@@ -14,7 +14,7 @@ import stat
 import typing
 from pathlib import Path
 from time import sleep
-from datetime import datetime, time, date, timedelta
+from datetime import datetime, time, date, timedelta, timezone
 from subprocess import CompletedProcess, Popen
 from typing import Any, Callable, Dict, Set, List, Optional, Union, Iterable
 
@@ -472,11 +472,7 @@ def copy_file(source_file: Path | str, destination_dir: Path | str):
     # Copy the file to the destination directory
     shutil.copy2(source_path, destination_path)
 
-    print('WARN: This function is not implemented yet.')
-    print('      set_file_write_time(disk_h_file_backup, current_time)')
-    # TODO: set_file_create_time(destination_path, get_file_create_time(source_path))
-    # log(f'File {source_path} copied to {destination_path}')
-
+    set_file_create_time(destination_path, get_file_create_time(source_path))
 
 def cp(source: Path | str, destination: Path | str):
     # TODO: documentation
@@ -986,122 +982,163 @@ def get_file_create_time(file_path: Path | str) -> datetime:
     return datetime.fromtimestamp(creation_time)
 
 
-def set_file_create_time(file_path: Path | str, new_create_date: datetime):
+def set_file_create_time(
+    file_path: Path | str,
+    new_create_date: datetime,
+    raise_exceptions: bool = True,
+    ignore_linux: bool = True,
+):
     """
-    Set the creation date of a file.
-    Note: This function might not work as expected on Unix-like systems.
+    Set the creation time ("birth time") of a file.
+
+    Platform behavior:
+    - Windows:
+      - Uses WinAPI `SetFileTime` to write the creation time.
+      - Timezone handling:
+        - If `new_create_date` is naive (tzinfo is None), it is interpreted as local time,
+          then converted to UTC internally for FILETIME storage.
+        - If `new_create_date` is timezone-aware, it is converted to UTC via
+          `new_create_date.astimezone(datetime.timezone.utc)`.
+      - Windows epoch starts at 1601-01-01 UTC; values earlier than this raise `ValueError`.
+      - Symlinks: the call follows symlinks (the target file's time is changed). Changing the
+        link object's own timestamps is not supported by this function.
+
+    - Non-Windows (Linux, macOS, BSD):
+      - Linux: if `ignore_linux` is True (default), the operation is silently ignored and no
+        exception is raised. If `ignore_linux` is False, `NotImplementedError` may be raised
+        depending on `raise_exceptions`.
+      - Other non-Windows (e.g., macOS, BSD): setting creation time is not supported and will
+        raise `NotImplementedError` depending on `raise_exceptions`.
+
+    Consistency with readers:
+    - `get_file_create_time()` returns a naive `datetime` in local time (as produced by
+      `os.path.getctime()` on this platform). This function stores Windows times in UTC,
+      but the reader presents them in local time for consistency.
 
     Args:
-    - file_path (str or Path): The path to the file.
-    - new_create_date (datetime): The new creation date to set.
+    - file_path: Path to the target file.
+    - new_create_date: Desired creation time.
+    - raise_exceptions: If True (default), errors are raised. If False, errors are suppressed and
+      the function returns without changing anything.
+    - ignore_linux: If True (default), on Linux this function does nothing and does not raise.
+
+    Raises:
+    - FileNotFoundError: If the path does not exist.
+    - IsADirectoryError: If the path is not a file.
+    - ValueError: If the provided time is invalid for the platform (e.g., < 1601-01-01 on Windows).
+    - OSError: If underlying WinAPI calls fail (open handle, SetFileTime).
+    - ImportError: If Windows API is unavailable on a Windows platform.
+    - NotImplementedError: On non-Windows platforms, when applicable and `raise_exceptions` is True.
     """
     path = Path(file_path)
     if not path.exists():
-        print(f'The file {path} does not exist.')
+        # File does not exist
+        if raise_exceptions:
+            raise FileNotFoundError(f'The file {path} does not exist.')
         return
-    
-    if not path.is_file():
-        print(f'The path {path} is not a file.')
-        return
-
     # Platform-specific implementation
     if is_wnd():  # Windows
         try:
-            from ctypes import windll, wintypes, byref, c_wchar_p
-            
+            from ctypes import windll, wintypes, byref, POINTER
+
             # Windows API constants
             GENERIC_WRITE = 0x40000000
             OPEN_EXISTING = 3
             FILE_ATTRIBUTE_NORMAL = 0x80
-            INVALID_HANDLE_VALUE = -1
-            FILETIME_TICKS_PER_SECOND = 10000000  # 100-nanosecond intervals per second
-            
-            # Convert datetime to Windows FILETIME directly
-            # Windows FILETIME is 100-nanosecond intervals since January 1, 1601 UTC
-            # For timezone-naive datetime objects, interpret them as local time 
-            # to match the behavior expected by get_file_create_time()
-            
-            # If datetime is timezone-naive, treat it as local time
+            FILETIME_TICKS_PER_SECOND = 10_000_000  # 100-nanosecond intervals per second
+
+            # Define WinAPI prototypes for correctness on 64-bit systems
+            CreateFileW = windll.kernel32.CreateFileW
+            CreateFileW.argtypes = [
+                wintypes.LPCWSTR,  # lpFileName
+                wintypes.DWORD,    # dwDesiredAccess
+                wintypes.DWORD,    # dwShareMode
+                wintypes.LPVOID,   # lpSecurityAttributes
+                wintypes.DWORD,    # dwCreationDisposition
+                wintypes.DWORD,    # dwFlagsAndAttributes
+                wintypes.HANDLE,   # hTemplateFile
+            ]
+            CreateFileW.restype = wintypes.HANDLE
+
+            SetFileTime = windll.kernel32.SetFileTime
+            SetFileTime.argtypes = [
+                wintypes.HANDLE,               # hFile
+                POINTER(wintypes.FILETIME),    # lpCreationTime
+                POINTER(wintypes.FILETIME),    # lpLastAccessTime
+                POINTER(wintypes.FILETIME),    # lpLastWriteTime
+            ]
+            SetFileTime.restype = wintypes.BOOL
+
+            CloseHandle = windll.kernel32.CloseHandle
+            CloseHandle.argtypes = [wintypes.HANDLE]
+            CloseHandle.restype = wintypes.BOOL
+
+            INVALID_HANDLE_VALUE = wintypes.HANDLE(-1).value
+
+            # Convert input datetime to UTC for FILETIME
             if new_create_date.tzinfo is None:
-                # Convert to UTC for storage by treating input as local time
-                from datetime import timezone
-                local_datetime = new_create_date.replace(tzinfo=datetime.now().astimezone().tzinfo)
-                utc_datetime = local_datetime.astimezone(timezone.utc)
+                local_tz = datetime.now().astimezone().tzinfo
+                utc_datetime = new_create_date.replace(tzinfo=local_tz).astimezone(timezone.utc)
             else:
                 utc_datetime = new_create_date.astimezone(timezone.utc)
-            
+
             # Windows epoch starts at 1601-01-01 UTC
             windows_epoch = datetime(1601, 1, 1, tzinfo=timezone.utc)
-            time_delta = utc_datetime - windows_epoch
-            
-            # Convert to 100-nanosecond intervals
-            windows_timestamp = int(time_delta.total_seconds() * FILETIME_TICKS_PER_SECOND)
-            
-            # Create FILETIME structure
-            ctime = wintypes.FILETIME(
-                windows_timestamp & 0xFFFFFFFF,  # Low part
-                windows_timestamp >> 32          # High part
+            if utc_datetime < windows_epoch:
+                # Unsupported time on Windows
+                raise ValueError('Creation time is before Windows epoch 1601-01-01 and is not supported.')
+
+            delta = utc_datetime - windows_epoch
+            # Convert to 100-nanosecond intervals without precision loss
+            ticks = (
+                (delta.days * 24 * 60 * 60 + delta.seconds) * FILETIME_TICKS_PER_SECOND
+                + delta.microseconds * 10
             )
-            
-            # Open file with write access
-            handle = windll.kernel32.CreateFileW(
-                c_wchar_p(str(path)),    # File path
-                GENERIC_WRITE,           # Access rights
-                0,                       # No sharing
-                None,                    # Security attributes
-                OPEN_EXISTING,           # Creation disposition
-                FILE_ATTRIBUTE_NORMAL,   # File attributes
-                None                     # Template file
+
+            ctime = wintypes.FILETIME(ticks & 0xFFFFFFFF, ticks >> 32)
+
+            handle = CreateFileW(
+                str(path),           # lpFileName
+                GENERIC_WRITE,       # dwDesiredAccess
+                0,                   # dwShareMode (no sharing)
+                None,                # lpSecurityAttributes
+                OPEN_EXISTING,       # dwCreationDisposition
+                FILE_ATTRIBUTE_NORMAL,  # dwFlagsAndAttributes
+                None                 # hTemplateFile
             )
-            
+
             if handle == INVALID_HANDLE_VALUE:
-                print(f'Failed to open file {path} for writing creation time.')
-                return
-            
-            # Set file creation time (first parameter is creation time, others are access and write time)
-            result = windll.kernel32.SetFileTime(handle, byref(ctime), None, None)
-            
-            # Close the file handle
-            windll.kernel32.CloseHandle(handle)
-            
-            if not result:
-                print(f'Failed to set creation time for file {path}.')
-                
-        except ImportError:
-            print('Windows API not available. Cannot set creation time.')
-        except Exception as e:
-            print(f'Error setting creation time for {path}: {e}')
-    
-    elif is_linux() or not is_wnd():  # Unix-like systems (Linux, macOS, BSD, etc.)
-        # On Unix-like systems, there's no direct way to set creation time
-        # We can try to use the birth time if available (macOS, some BSD systems)
-        # For most Unix systems, this will have limited effect
-        try:
-            # Convert datetime to Unix timestamp
+                # Opening file handle failed
+                raise OSError(f'Failed to open file {path} for writing creation time.')
+
             try:
-                timestamp = new_create_date.timestamp()
-            except (OSError, ValueError) as e:
-                # Handle edge cases like dates before epoch on some systems
-                print(f'Error converting datetime to timestamp for {path}: {e}')
-                return
-            
-            # Try to preserve access time and only update creation time
-            stat_result = path.stat()
-            access_time = stat_result.st_atime
-            
-            # On some Unix systems, we can try to manipulate file times
-            # This is a best-effort approach and may not actually change creation time
-            os.utime(path, (access_time, timestamp))
-            
-            # Note: This doesn't actually set creation time on most Unix systems
-            # It only sets modification time, but it's the best we can do
-            
-        except Exception as e:
-            print(f'Error attempting to set file time for {path}: {e}')
-    
-    else:
-        print(f'Setting file creation time is not supported on this platform.')
+                result = SetFileTime(handle, byref(ctime), None, None)
+                if not result:
+                    # Setting creation time failed
+                    raise OSError(f'Failed to set creation time for file {path}.')
+            finally:
+                CloseHandle(handle)
+
+        except ImportError:
+            # Windows API is not available
+            if raise_exceptions:
+                raise ImportError('Windows API not available. Cannot set creation time.')
+            return
+        except Exception:
+            # Unexpected exceptions
+            if raise_exceptions:
+                raise
+            return
+
+    else:  # Unix-like systems (Linux, macOS, BSD, etc.)
+        # Linux can be ignored conditionally
+        if is_linux() and ignore_linux:
+            return
+        # Creation time setting is not supported on non-Windows platforms
+        if raise_exceptions:
+            raise NotImplementedError('Setting file creation time is not supported on this platform.')
         return
+
 
 
 def touch(file: Path | str, mode=None, exist_ok=True):
