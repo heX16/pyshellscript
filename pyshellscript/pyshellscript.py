@@ -27,7 +27,7 @@ except ImportError:
 # Base ################################################################
 
 def pyshellscript_version():
-    return '0.5.1'
+    return '0.5.3'
 
 
 # Global variable ################################################################
@@ -143,7 +143,19 @@ def get_os_name() -> str:
 
 # Files data ################################################################
 
-def get_file_content(file_name: str | Path, encoding='utf-8', ignore_io_error=False) -> str:
+def tail(content: Path | str | list[str | None]) -> str:
+    if isinstance(content, Path):
+        content = get_file_content(content, ignore_io_error=True, split=True)
+    if isinstance(content, str):
+        content = content.splitlines()
+    if not content:
+        return ''
+    for s in reversed(content):
+        if s != '' and s != None:
+            return s
+    return ''
+
+def get_file_content(file_name: str | Path, encoding='utf-8', split=False, ignore_io_error=False) -> str | list[str]:
     """
     Reads the content of a file and returns it as a string.
 
@@ -160,7 +172,11 @@ def get_file_content(file_name: str | Path, encoding='utf-8', ignore_io_error=Fa
     """
     try:
         with open(file_name, 'r', encoding=encoding) as f:
-            return str(f.read())
+            content = str(f.read())
+            if split:
+                return content.splitlines()
+            else:
+                return content
     except IOError:
         if ignore_io_error:
             return ''
@@ -1299,7 +1315,7 @@ def file_list_filter_by_flags(
 ) -> List[Path]:
     """
     Filters the given list of files or directories based on specified criteria.
-    
+
     This function is Python analog of the Linux 'find' command.
     Each parameter has a corresponding parameter in the 'find' command
     (see the 'Find analog:' line in the documentation).
@@ -1307,15 +1323,15 @@ def file_list_filter_by_flags(
     Parameters:
     file_list (Iterable[Union[Path, str]]):
         File and directory paths to filter.
-        Array of strings. 
+        Array of strings.
         Or array of `Path` objects (`Path` are recommended).
         Instead of arrays, can be iterators (such as `Path.iterdir()`).
         Find analog: PATH argument
-    existing (bool, optional): 
+    existing (bool, optional):
         Filter by existing.
         Can be `True` or `False` or `None`. Default is None.
         If None, do not filter by existing.
-        If True, include only existing files or directories. 
+        If True, include only existing files or directories.
         If False, include only non-existing (useful for searching for files that do not exist).
         Find analog: no direct analog (find searches existing files by default)
     only_files (bool, optional):
@@ -1397,12 +1413,12 @@ def file_list_filter_by_flags(
         If True, include only empty files or directories. Default is None.
         Find analog: "-empty"
 
-    maxdepth (int, optional): 
-        Maximum depth of directories to include. 
+    maxdepth (int, optional):
+        Maximum depth of directories to include.
         Default is None.
         Find analog: "-maxdepth N"
-    mindepth (int, optional): 
-        Minimum depth of directories to include. 
+    mindepth (int, optional):
+        Minimum depth of directories to include.
         Default is None.
         Find analog: "-mindepth N"
 
@@ -1482,10 +1498,10 @@ def file_list_filter_by_flags(
         # Check depth constraints
         if maxdepth is not None or mindepth is not None:
             depth = len(file_path.parts)
-            
+
             if maxdepth is not None and depth > maxdepth:
                 continue
-                
+
             if mindepth is not None and depth < mindepth:
                 continue
 
@@ -1626,7 +1642,8 @@ def run_command(command: str,
                 stdin=None,
                 background=False,
                 ensure_unique=False,
-                raise_exception=False) -> subprocess.Popen | RunOk | RunFail | RunFailProcessPresent:
+                raise_exception=False,
+                hidden_console=False) -> subprocess.Popen | RunOk | RunFail | RunFailProcessPresent:
     """
     Executes a command with various options such as running in the background, capturing output, ensuring uniqueness,
     and handling custom stdin input.
@@ -1644,6 +1661,9 @@ def run_command(command: str,
       immediately with a subprocess.Popen object, and you will not receive captured output or a return code.
     - ensure_unique (bool): Ensure the command runs only if it's not already running. Defaults to False.
     - raise_exception (bool): Whether to raise an exception if the command is already running and ensure_unique is True.
+    - hidden_console (bool): On Windows, run process detached from parent console with no window created. Defaults to False.
+        If True, process will not be killed when parent console closes, and no console window will appear.
+        Note: capture_output is ignored in this mode (output is discarded).
 
     Returns:
     - subprocess.Popen | RunOk | RunFail | RunFailProcessPresent:
@@ -1714,10 +1734,23 @@ def run_command(command: str,
 
     stdout_setting = subprocess.PIPE if capture_output else None
 
+    # Windows-specific: detached process with no window
+    creationflags = 0
+    if hidden_console and is_wnd():
+        # Detach from parent console and don't create window
+        creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+        # Redirect stdio to DEVNULL since there's no console
+        stdin_setting = subprocess.DEVNULL
+        stdout_setting = subprocess.DEVNULL
+        stderr_setting = subprocess.DEVNULL
+    else:
+        stderr_setting = subprocess.PIPE
+
     try:
         process = subprocess.Popen(
             command, shell=True,
-            stdin=stdin_setting, stdout=stdout_setting, stderr=subprocess.PIPE, text=True, universal_newlines=True)
+            stdin=stdin_setting, stdout=stdout_setting, stderr=stderr_setting,
+            text=True, universal_newlines=True, creationflags=creationflags)
     except (OSError, ValueError, subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
         if raise_exception:
             raise e
@@ -1752,7 +1785,7 @@ def run_command(command: str,
     return process
 
 
-def sh(command_string: str, background=False, capture_output=False, ensure_unique=False):
+def sh(command_string: str, background=False, capture_output=False, ensure_unique=False, hidden_console=False):
     """
     Executes multiple shell commands provided in a single string, separated by newlines.
 
@@ -1761,6 +1794,7 @@ def sh(command_string: str, background=False, capture_output=False, ensure_uniqu
     - background (bool): Whether to run the commands in the background. Defaults to False.
     - capture_output (bool): Whether to capture the commands' stdout. Defaults to False.
     - ensure_unique (bool): Ensure each command runs only if it's not already running. Defaults to False.
+    - hidden_console (bool): On Windows, run process detached from parent console with no window created. Defaults to False.
 
     Returns:
     - If command is one - result of the `run_command` calls.
@@ -1772,7 +1806,7 @@ def sh(command_string: str, background=False, capture_output=False, ensure_uniqu
     commands = command_string.strip().split('\n')
     results = []
     for command in commands:
-        result = run_command(command, background=background, capture_output=capture_output, ensure_unique=ensure_unique)
+        result = run_command(command, background=background, capture_output=capture_output, ensure_unique=ensure_unique, hidden_console=hidden_console)
         results.append(result)
     if len(results) == 1:
         results = results[0]
@@ -1781,7 +1815,7 @@ def sh(command_string: str, background=False, capture_output=False, ensure_uniqu
 
 # Proc #
 
-
+# TODO: add a check included full path, and add check included exec arguments
 def proc_present(process_name: str, ignore_exe_extension: bool | typing.Any = None) -> bool:
     """
     Checks if a process with the specified name is currently running on the system.
@@ -2010,7 +2044,7 @@ def _datetime_format_readable_to_strftime(format_str: str) -> str:
 
     def _insert(text: str, index: int, overwrite_str: str) -> str:
         return text[:index] + overwrite_str + text[index+len(overwrite_str):]
-    
+
     mapping = [
         ('YYYY', '%Y'),
         ('YY', '%y'),
@@ -2028,27 +2062,27 @@ def _datetime_format_readable_to_strftime(format_str: str) -> str:
         mm_pos = format_str.find('MM', hh_pos)
         if mm_pos != -1:
             format_str = _insert(format_str, mm_pos, 'MN')  # minutes
-    
+
     # Month replacement
     mm_pos = format_str.find('MM')
     if mm_pos != -1:
         format_str = _insert(format_str, mm_pos, 'MO')  # month
-    
+
     # Replace other patterns
     for k, v in mapping:
         format_str = format_str.replace(k, v, 1)
 
     return format_str
-   
+
 
 def datetime_to_str(time_value: Union[datetime, date, time], format_str: str) -> str:
     """
     Format datetime using human-readable format strings.
-    
-    Simplified alternative to strftime() codes. Instead of cryptic '%Y-%m-%d %H:%M:%S', 
+
+    Simplified alternative to strftime() codes. Instead of cryptic '%Y-%m-%d %H:%M:%S',
     use intuitive 'YYYY-MM-DD HH:MM:SS'.
-    
-    Supported patterns: 
+
+    Supported patterns:
         YYYY/YY, MO/MM, DD, HH, MN/MM, SS, ZZ
 
     Examples:
@@ -2058,7 +2092,7 @@ def datetime_to_str(time_value: Union[datetime, date, time], format_str: str) ->
         '2024-01-15'
         >>> datetime_format_readable(datetime(2024, 1, 15, 14, 30), 'YYYY-MM-DD HH:MM:SS')
         '2024-01-15 14:30:00'
-    
+
     Note:
         Converts readable patterns to C standard (1989) strftime() format codes internally.
         (Converts example: 'YYYY-MO-DD HH:MN' -> '%Y-%m-%d %H:%M'.)
@@ -2084,7 +2118,7 @@ def datetime_to_yyyy_mm_dd_hh_mm(time_value: Union[datetime, date]) -> str:
 
 
 def datetime_to_yyyy_mm_dd(
-        time_value: Union[datetime, date], 
+        time_value: Union[datetime, date],
         delimiter: str = '-') -> str:
     """
     Convert time to 'YYYY-MM-DD' format.
@@ -2096,7 +2130,7 @@ def datetime_to_yyyy_mm_dd(
 
 
 def datetime_to_hh_mm_ss(
-        time_value: Union[datetime, time], 
+        time_value: Union[datetime, time],
         delimiter: str = ':') -> str:
     """
     Convert time to 'HH:MM:SS' format.
@@ -2108,7 +2142,7 @@ def datetime_to_hh_mm_ss(
 
 
 def datetime_to_hh_mm(
-        time_value: Union[datetime, time], 
+        time_value: Union[datetime, time],
         delimiter: str = ':') -> str:
     """
     Convert time to 'HH:MM' format.
@@ -2393,7 +2427,7 @@ def dict_cast_values(dict_values: Dict[str, Any], default_values: Dict[str, Any]
 def _set_global_variables(config: Dict[str, Any]) -> None:
     """
     Set global variables from config dictionary.
-    
+
     Parameters:
     config (Dict[str, Any]): Configuration dictionary
     """
@@ -2517,7 +2551,7 @@ def save_to_yaml(yaml_file: Union[Path, str], data: Dict, encoding: str = 'utf-8
     data = yaml.dump(data, default_flow_style=False, allow_unicode=True)
     if (check_file_content == False or
         (check_file_content and get_file_content(yaml_file, encoding=encoding) != data)):
-        
+
         with open(yaml_file, 'w', encoding=encoding) as f:
             f.write(data)
 
